@@ -15,7 +15,8 @@ ENV \
   LC_ALL=en_US.UTF-8
 
 # Install FPM (for building packages) and ronn (for making manpages)
-RUN gem install fpm:1.14.1 ronn:0.7.3 public_suffix:5.1.1
+RUN gem install public_suffix -v 5.1.1
+RUN gem install fpm:1.14.1 ronn:0.7.3
 
 RUN mkdir /workdir
 WORKDIR /workdir
