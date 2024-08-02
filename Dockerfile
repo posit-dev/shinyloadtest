@@ -16,6 +16,7 @@ ENV \
 
 # Install FPM (for building packages) and ronn (for making manpages)
 RUN gem install public_suffix -v 5.1.1
+RUN gem install dotenv -v 2.8.1
 RUN gem install fpm:1.14.1 ronn:0.7.3
 
 RUN mkdir /workdir
