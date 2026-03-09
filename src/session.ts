@@ -6,7 +6,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { CookieJar } from "tough-cookie";
-
+import { VERSION } from "./version.js";
 import {
   loginUrlFor,
   extractHiddenInputs,
@@ -41,7 +41,7 @@ import { ShinyWebSocket } from "./websocket.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const USER_AGENT = "shinycannon/0.0.1";
+const USER_AGENT = `shinycannon/${VERSION}`;
 
 // ---------------------------------------------------------------------------
 // Stats
@@ -264,11 +264,20 @@ async function handleReqPost(
   if (event.datafile !== undefined) {
     const parentDir = path.dirname(state.recordingPath);
     const filePath = path.resolve(parentDir, event.datafile);
-    const resolvedParent = path.resolve(parentDir);
-    if (!filePath.startsWith(resolvedParent + path.sep) && filePath !== resolvedParent) {
+    const realParent = fs.realpathSync(path.resolve(parentDir));
+    let realFile: string;
+    try {
+      realFile = fs.realpathSync(filePath);
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error(`Datafile not found: ${event.datafile}`);
+      }
+      throw err;
+    }
+    if (!realFile.startsWith(realParent + path.sep) && realFile !== realParent) {
       throw new Error(`Datafile path escapes recording directory: ${event.datafile}`);
     }
-    body = fs.readFileSync(filePath);
+    body = fs.readFileSync(realFile);
     contentType = "application/octet-stream";
   }
 
@@ -289,7 +298,7 @@ async function handleWsOpen(
   const wsUrl = joinPaths(wsBaseUrl, renderedUrl);
 
   const cookieString = await getCookieString(
-    (state.httpClient as unknown as { cookieJar: CookieJar }).cookieJar,
+    state.httpClient.cookieJar,
     state.httpUrl,
   );
 
@@ -546,6 +555,7 @@ export async function runSession(
     // Login if needed
     headers = await maybeLogin(httpClient, httpUrl, creds, headers, logger);
     state.headers = headers;
+    httpClient.setHeaders(headers);
 
     // Start delay
     if (startDelayMs !== undefined && startDelayMs > 0) {
