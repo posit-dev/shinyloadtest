@@ -6,6 +6,7 @@ import { createLogger } from "./logger.js";
 import { createOutputDir } from "./output.js";
 import { runEnduranceTest } from "./worker.js";
 import { SERVER_TYPE_NAMES } from "./types.js";
+import { TerminalUI } from "./ui.js";
 
 async function main(): Promise<void> {
   const args = parseArgs();
@@ -47,6 +48,27 @@ async function main(): Promise<void> {
 
   const { argsString, argsJson } = serializeArgs(args);
 
+  const ui = process.stderr.isTTY
+    ? new TerminalUI({
+        version: VERSION,
+        appUrl: args.appUrl,
+        workers: args.workers,
+        loadedDurationMinutes: args.loadedDurationMinutes,
+        outputDir: args.outputDir,
+      })
+    : undefined;
+
+  ui?.showBanner();
+
+  // Ensure Ctrl+C / kill cleanly stops the spinner and exits
+  const handleSignal = (signal: NodeJS.Signals): void => {
+    ui?.cleanup();
+    const codes: Record<string, number> = { SIGINT: 130, SIGTERM: 143 };
+    process.exit(codes[signal] ?? 1);
+  };
+  process.on("SIGINT", handleSignal);
+  process.on("SIGTERM", handleSignal);
+
   await runEnduranceTest({
     httpUrl: args.appUrl,
     recording,
@@ -60,6 +82,7 @@ async function main(): Promise<void> {
     logger,
     argsString,
     argsJson,
+    ui,
   });
 }
 
