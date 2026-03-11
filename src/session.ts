@@ -41,7 +41,7 @@ import { ShinyWebSocket } from "./websocket.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const USER_AGENT = `shinycannon/${VERSION}`;
+const USER_AGENT = `shinyloadtest/${VERSION}`;
 
 // ---------------------------------------------------------------------------
 // Stats
@@ -116,11 +116,15 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(signal.reason ?? new Error("Aborted"));
       return;
     }
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
-      reject(signal.reason ?? new Error("Aborted"));
-    }, { once: true });
+      reject(signal!.reason ?? new Error("Aborted"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -185,7 +189,7 @@ async function maybeLogin(
       }
     } else {
       logger.info(
-        "SHINYCANNON_USER and SHINYCANNON_PASS set, but target app doesn't require authentication.",
+        "SHINYLOADTEST_USER and SHINYLOADTEST_PASS set, but target app doesn't require authentication.",
       );
     }
   }
