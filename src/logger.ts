@@ -6,6 +6,7 @@ export enum LogLevel {
   INFO = 1,
   WARN = 2,
   ERROR = 3,
+  SILENT = 4,
 }
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
@@ -13,6 +14,7 @@ const LEVEL_LABELS: Record<LogLevel, string> = {
   [LogLevel.INFO]: "INFO ",
   [LogLevel.WARN]: "WARN ",
   [LogLevel.ERROR]: "ERROR",
+  [LogLevel.SILENT]: "",
 }
 
 export function parseLogLevel(s: string): LogLevel {
