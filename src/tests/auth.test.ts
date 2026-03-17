@@ -4,8 +4,39 @@ import {
   extractHiddenInputs,
   connectApiKeyHeader,
   getCreds,
+  isProtected,
 } from "../auth.js"
 import { ServerType } from "../types.js"
+import type { HttpClient } from "../http.js"
+
+function mockHttpClient(statusCode: number): HttpClient {
+  return {
+    get: async () => ({ statusCode, headers: {}, body: "" }),
+  } as unknown as HttpClient
+}
+
+describe("isProtected", () => {
+  it("returns false for 200", async () => {
+    expect(await isProtected(mockHttpClient(200), "http://example.com")).toBe(
+      false,
+    )
+  })
+  it("returns true for 401", async () => {
+    expect(await isProtected(mockHttpClient(401), "http://example.com")).toBe(
+      true,
+    )
+  })
+  it("returns true for 403", async () => {
+    expect(await isProtected(mockHttpClient(403), "http://example.com")).toBe(
+      true,
+    )
+  })
+  it("returns true for 404", async () => {
+    expect(await isProtected(mockHttpClient(404), "http://example.com")).toBe(
+      true,
+    )
+  })
+})
 
 describe("loginUrlFor", () => {
   it("appends __login__ for RSC", () => {

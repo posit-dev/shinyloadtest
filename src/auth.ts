@@ -54,7 +54,11 @@ export async function isProtected(
   appUrl: string,
 ): Promise<boolean> {
   const resp = await httpClient.get(appUrl)
-  return resp.statusCode === 403 || resp.statusCode === 404
+  return (
+    resp.statusCode === 401 ||
+    resp.statusCode === 403 ||
+    resp.statusCode === 404
+  )
 }
 
 // ---------------------------------------------------------------------------

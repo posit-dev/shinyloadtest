@@ -140,7 +140,15 @@ export class ShinyWebSocket {
     this.ws.on("message", (data: WebSocket.Data) => {
       const msg = data.toString()
 
-      if (canIgnore(msg)) {
+      let ignore: boolean
+      try {
+        ignore = canIgnore(msg)
+      } catch (err) {
+        this.triggerFailure(err instanceof Error ? err : new Error(String(err)))
+        return
+      }
+
+      if (ignore) {
         options.onIgnored?.(msg)
         return
       }

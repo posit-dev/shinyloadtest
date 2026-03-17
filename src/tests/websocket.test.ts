@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { AsyncQueue } from "../websocket.js"
+import { WebSocketServer } from "ws"
+import { AsyncQueue, ShinyWebSocket } from "../websocket.js"
 import type { WSMessage } from "../websocket.js"
 
 describe("AsyncQueue", () => {
@@ -66,6 +67,30 @@ describe("AsyncQueue", () => {
     q.offer("item")
     expect(q.size).toBe(0)
     expect(await pollPromise).toBe("item")
+  })
+})
+
+describe("ShinyWebSocket malformed frame handling", () => {
+  it("routes malformed frame through triggerFailure instead of throwing uncaught", async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    await new Promise<void>((resolve) => wss.once("listening", resolve))
+    const { port } = wss.address() as { port: number }
+
+    wss.once("connection", (ws) => {
+      ws.send("notvalidjson[")
+    })
+
+    const sws = new ShinyWebSocket({
+      url: `ws://127.0.0.1:${port}`,
+      headers: {},
+    })
+
+    try {
+      await expect(sws.receive(() => {})).rejects.toThrow()
+    } finally {
+      sws.close()
+      await new Promise<void>((resolve) => wss.close(() => resolve()))
+    }
   })
 })
 
