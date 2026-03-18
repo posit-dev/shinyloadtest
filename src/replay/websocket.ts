@@ -2,8 +2,8 @@
 // Wraps the `ws` library for use during Shiny session playback.
 
 import WebSocket from "ws"
-import { canIgnore } from "./sockjs.js"
-import { RECEIVE_QUEUE_SIZE } from "./types.js"
+import { canIgnore } from "../sockjs.js"
+import { RECEIVE_QUEUE_SIZE } from "../types.js"
 
 // ---------------------------------------------------------------------------
 // AsyncQueue

@@ -3,7 +3,11 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 
-import { createOutputDir, defaultOutputDir, SessionWriter } from "../output.js"
+import {
+  createOutputDir,
+  defaultOutputDir,
+  SessionWriter,
+} from "../replay/output.js"
 
 describe("defaultOutputDir", () => {
   it("replaces colons with underscores", () => {

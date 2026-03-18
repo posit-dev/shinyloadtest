@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 
-import { Stats } from "../session.js"
-import { formatNumber, formatRate } from "../ui.js"
+import { Stats } from "../replay/session.js"
+import { formatNumber, formatRate } from "../replay/ui.js"
 
 describe("Stats", () => {
   it("tracks event count via recordEvent()", () => {

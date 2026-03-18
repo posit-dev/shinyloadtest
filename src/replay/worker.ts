@@ -4,11 +4,11 @@
  * staggered start, loaded duration control, and progress reporting.
  */
 
-import type { Logger } from "./logger.js"
+import type { Logger } from "../logger.js"
 import { Stats, runSession } from "./session.js"
 import type { SessionConfig } from "./session.js"
-import type { Recording, Creds } from "./types.js"
-import type { TerminalUI } from "./ui.js"
+import type { Recording, Creds } from "../types.js"
+import type { ReplayTerminalUI } from "./ui.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,7 +27,7 @@ export interface EnduranceTestConfig {
   logger: Logger
   argsString: string
   argsJson: string
-  ui?: TerminalUI
+  ui?: ReplayTerminalUI
 }
 
 // ---------------------------------------------------------------------------

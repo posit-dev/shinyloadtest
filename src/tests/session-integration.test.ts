@@ -3,11 +3,16 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
-import { runSession, Stats, extractCommId, replaceCommIds } from "../session.js"
-import type { SessionConfig } from "../session.js"
+import {
+  runSession,
+  Stats,
+  extractCommId,
+  replaceCommIds,
+} from "../replay/session.js"
+import type { SessionConfig } from "../replay/session.js"
 import { readRecordingFromString } from "../recording.js"
 import { createLogger, LogLevel } from "../logger.js"
-import { createOutputDir } from "../output.js"
+import { createOutputDir } from "../replay/output.js"
 
 let mock: MockShinyServer
 let tmpDir: string

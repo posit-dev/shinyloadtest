@@ -4,12 +4,12 @@ import * as net from "node:net"
 import * as path from "node:path"
 import * as os from "node:os"
 
-import { runSession, Stats } from "../session.js"
+import { runSession, Stats } from "../replay/session.js"
 import { readRecordingFromString } from "../recording.js"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
 import { createLogger, LogLevel } from "../logger.js"
 import type { Logger } from "../logger.js"
-import { createOutputDir } from "../output.js"
+import { createOutputDir } from "../replay/output.js"
 
 /** Get an unused local port by briefly binding and releasing. */
 function getUnusedPort(): Promise<number> {

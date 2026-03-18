@@ -68,10 +68,10 @@ function statsLine(stats: StatsCounts): string {
 }
 
 // ---------------------------------------------------------------------------
-// TerminalUI
+// ReplayTerminalUI
 // ---------------------------------------------------------------------------
 
-export class TerminalUI {
+export class ReplayTerminalUI {
   private config: UIConfig
   private spinner: Ora
   private updateTimer: ReturnType<typeof setInterval> | null = null

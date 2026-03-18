@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { WebSocketServer } from "ws"
-import { AsyncQueue, ShinyWebSocket } from "../websocket.js"
-import type { WSMessage } from "../websocket.js"
+import { AsyncQueue, ShinyWebSocket } from "../replay/websocket.js"
+import type { WSMessage } from "../replay/websocket.js"
 
 describe("AsyncQueue", () => {
   it("returns items in FIFO order", async () => {
