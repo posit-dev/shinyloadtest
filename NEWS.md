@@ -1,5 +1,28 @@
-# shinycannon (development)
+# shinyloadtest 2.0.0 (development)
 
+This release is a complete rewrite of shinycannon in TypeScript/Node.js,
+published as `@posit-dev/shinyloadtest` on npm.
+
+* Install via `npm install -g @posit-dev/shinyloadtest` or run directly with
+  `npx @posit-dev/shinyloadtest`. The `npx shinycannon` shorthand is also
+  supported via a stub package.
+
+* The primary CLI command is now `shinyloadtest replay <recording> [app-url]`.
+  The `shinycannon` command is retained as a backwards-compatible alias.
+
+* App URL is now optional; when omitted, the URL from the recording is used.
+
+* Environment variables renamed to `SHINYLOADTEST_USER`, `SHINYLOADTEST_PASS`,
+  and `SHINYLOADTEST_CONNECT_API_KEY`. The legacy `SHINYCANNON_*` names are
+  still accepted as fallbacks.
+
+* Added a live terminal UI that displays per-worker status, session counts, and
+  event throughput stats during the loaded phase.
+
+* Added support for Jupyter widget / shinywidgets messages in recordings.
+
+* The recording format, output format, and analysis workflows with the
+  shinyloadtest R package are fully compatible with previous versions.
 
 
 
