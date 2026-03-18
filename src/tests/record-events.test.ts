@@ -109,4 +109,14 @@ describe("classifyGetRequest()", () => {
       classifyGetRequest("/__sockjs__/000/abc123/n=xyz789?foo=bar"),
     ).toEqual({ type: "REQ_SINF", robustId: "xyz789" })
   })
+
+  it("classifies REQ_SINF with n= in query params", () => {
+    expect(classifyGetRequest("/__sockjs__/000/abc123?n=xyz789")).toEqual({
+      type: "REQ_SINF",
+      robustId: "xyz789",
+    })
+    expect(
+      classifyGetRequest("/__sockjs__/000/abc123?foo=bar&n=xyz789"),
+    ).toEqual({ type: "REQ_SINF", robustId: "xyz789" })
+  })
 })

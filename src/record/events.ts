@@ -116,10 +116,23 @@ export function classifyGetRequest(pathWithQuery: string): {
     return { type: "REQ_TOK" }
   }
 
-  // REQ_SINF: /__sockjs__/...n=<id>
-  const sinfMatch = /\/__sockjs__\/(?:.*\/)?n=([^/?&]+)/.exec(path)
-  if (sinfMatch?.[1]) {
-    return { type: "REQ_SINF", robustId: sinfMatch[1] }
+  // REQ_SINF: /__sockjs__/ with n=<id> in path segment or query param
+  if (path.includes("/__sockjs__/")) {
+    // Check path segments for n=<id>
+    const pathNMatch = /\/n=([^/?&]+)/.exec(path)
+    if (pathNMatch?.[1]) {
+      return { type: "REQ_SINF", robustId: pathNMatch[1] }
+    }
+    // Check query params for n=<id>
+    try {
+      const parsed = new URL(pathWithQuery, "http://localhost")
+      const n = parsed.searchParams.get("n")
+      if (n) {
+        return { type: "REQ_SINF", robustId: n }
+      }
+    } catch {
+      // Malformed URL, fall through
+    }
   }
 
   return { type: "REQ_GET" }

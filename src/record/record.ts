@@ -91,6 +91,12 @@ export async function record(options: RecordOptions): Promise<void> {
       let password = creds.pass
 
       if (username === null || password === null) {
+        if (!process.stdin.isTTY) {
+          throw new Error(
+            "The application requires authentication but stdin is not a TTY. " +
+              "Set SHINYLOADTEST_USER and SHINYLOADTEST_PASS environment variables.",
+          )
+        }
         ui?.cleanup()
         console.error("The application requires authentication.")
         const prompted = await promptCredentials()
@@ -123,85 +129,90 @@ export async function record(options: RecordOptions): Promise<void> {
       rscApiKeyRequired,
     })
 
-    // Create recording tokens
-    const tokens = new RecordingTokens()
+    try {
+      // Create recording tokens
+      const tokens = new RecordingTokens()
 
-    // Create and start proxy
-    const startTime = Date.now()
-    let shutdownResolve: (() => void) | null = null
-    const shutdownPromise = new Promise<void>((resolve) => {
-      shutdownResolve = resolve
-    })
+      // Create and start proxy
+      const startTime = Date.now()
+      let shutdownResolve: (() => void) | null = null
+      const shutdownPromise = new Promise<void>((resolve) => {
+        shutdownResolve = resolve
+      })
 
-    const proxy = new RecordingProxy({
-      targetUrl,
-      host,
-      port,
-      writer,
-      tokens,
-      cookieJar,
-      authHeaders,
-      onFirstConnection: () => {
-        ui?.startRecording(() => writer.eventCount)
-      },
-      onShutdown: () => {
-        ui?.stopRecording()
-        if (!ui) console.error("Client disconnected. Stopping recording.")
-        shutdownResolve?.()
-      },
-    })
+      let recording = false
+      const proxy = new RecordingProxy({
+        targetUrl,
+        host,
+        port,
+        writer,
+        tokens,
+        cookieJar,
+        authHeaders,
+        onFirstConnection: () => {
+          recording = true
+          ui?.startRecording(() => writer.eventCount)
+        },
+        onShutdown: () => {
+          ui?.stopRecording("disconnected")
+          if (!ui) console.error("Client disconnected. Stopping recording.")
+          shutdownResolve?.()
+        },
+      })
 
-    await proxy.start()
+      await proxy.start()
 
-    const proxyUrl = `http://${host}:${port}`
+      const proxyUrl = `http://${host}:${port}`
 
-    ui?.showBanner({ version: VERSION, targetUrl, proxyUrl, output })
-    ui?.startWaiting(proxyUrl)
-    if (!ui) {
-      console.error(`Proxy URL: ${proxyUrl}`)
-      console.error(`Output: ${output}`)
-      console.error(
-        `Navigate your browser to the proxy URL to begin recording: ${proxyUrl}`,
-      )
-    }
-
-    // Open browser if requested
-    if (open) {
-      openBrowser(proxyUrl)
-    }
-
-    // Handle Ctrl+C
-    const handleSignal = (): void => {
-      ui?.stopRecording()
-      if (!ui) console.error("Interrupted. Stopping recording.")
-      shutdownResolve?.()
-    }
-    process.on("SIGINT", handleSignal)
-    process.on("SIGTERM", handleSignal)
-
-    // Wait for shutdown
-    await shutdownPromise
-
-    // Clean up
-    process.removeListener("SIGINT", handleSignal)
-    process.removeListener("SIGTERM", handleSignal)
-
-    await proxy.stop()
-    writer.close()
-
-    ui?.finish({
-      output,
-      eventCount: writer.eventCount,
-      postFileCount: writer.postFileCount_,
-      duration: Date.now() - startTime,
-    })
-    if (!ui) {
-      console.error(`Recording saved to: ${output}`)
-      if (writer.postFileCount_ > 0) {
+      ui?.showBanner({ version: VERSION, targetUrl, proxyUrl, output })
+      ui?.startWaiting(proxyUrl)
+      if (!ui) {
+        console.error(`Proxy URL: ${proxyUrl}`)
+        console.error(`Output: ${output}`)
         console.error(
-          `Note: ${writer.postFileCount_} POST file(s) saved alongside the recording.`,
+          `Navigate your browser to the proxy URL to begin recording: ${proxyUrl}`,
         )
       }
+
+      // Open browser if requested
+      if (open) {
+        openBrowser(proxyUrl)
+      }
+
+      // Handle Ctrl+C
+      const handleSignal = (): void => {
+        ui?.stopRecording(recording ? "interrupted" : "cancelled")
+        if (!ui) console.error("Interrupted. Stopping recording.")
+        shutdownResolve?.()
+      }
+      process.on("SIGINT", handleSignal)
+      process.on("SIGTERM", handleSignal)
+
+      // Wait for shutdown
+      await shutdownPromise
+
+      // Clean up
+      process.removeListener("SIGINT", handleSignal)
+      process.removeListener("SIGTERM", handleSignal)
+
+      await proxy.stop()
+
+      ui?.finish({
+        output,
+        eventCount: writer.eventCount,
+        postFileCount: writer.postFileCount_,
+        duration: Date.now() - startTime,
+      })
+      if (!ui) {
+        console.error(`Recording saved to: ${output}`)
+        if (writer.postFileCount_ > 0) {
+          console.error(
+            `Note: ${writer.postFileCount_} POST file(s) saved alongside the recording.`,
+          )
+        }
+      }
+    } finally {
+      writer.close()
     }
   } finally {
     ui?.cleanup()

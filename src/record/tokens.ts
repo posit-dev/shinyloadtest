@@ -13,7 +13,9 @@ export class RecordingTokens {
    */
   discover(name: string, value: string): void {
     if (!value) return
-    this.tokens.set(value, name)
+    if (!this.tokens.has(value)) {
+      this.tokens.set(value, name)
+    }
   }
 
   /**

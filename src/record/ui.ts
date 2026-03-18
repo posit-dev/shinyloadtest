@@ -116,11 +116,17 @@ export class RecordTerminalUI {
     }, 1000)
   }
 
-  stopRecording(): void {
+  stopRecording(reason?: "disconnected" | "interrupted" | "cancelled"): void {
     this.stopUpdates()
     this.spinner.stop()
     const w = process.stderr.write.bind(process.stderr)
-    w(`${green("\u2714")} Browser disconnected ${dim(`[${timestamp()}]`)}\n`)
+    const label =
+      reason === "interrupted"
+        ? "Recording interrupted"
+        : reason === "cancelled"
+          ? "Recording cancelled"
+          : "Browser disconnected"
+    w(`${green("\u2714")} ${label} ${dim(`[${timestamp()}]`)}\n`)
   }
 
   finish(config: {

@@ -43,7 +43,8 @@ function stripHopByHop(
   const toRemove = new Set(HOP_BY_HOP_HEADERS)
   const connHeader = headers["connection"]
   if (connHeader) {
-    for (const token of connHeader.split(",")) {
+    const raw = Array.isArray(connHeader) ? connHeader.join(",") : connHeader
+    for (const token of raw.split(",")) {
       toRemove.add(token.trim().toLowerCase())
     }
   }
@@ -347,7 +348,7 @@ export class RecordingProxy {
       this.writer.writeEvent(
         makeWsEvent("WS_RECV", new Date(), { message: msg }),
       )
-      clientWs.send(msg)
+      sendToClient(msg)
     })
 
     // Server open: flush buffer

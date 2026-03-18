@@ -116,13 +116,30 @@ function readRecordingEvents(
     .map((line) => JSON.parse(line) as Record<string, unknown>)
 }
 
-function waitForMessages(ws: WebSocket, count = 1): Promise<string[]> {
-  return new Promise((resolve) => {
+function waitForMessages(
+  ws: WebSocket,
+  count = 1,
+  timeoutMs = 5000,
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
     const msgs: string[] = []
-    ws.on("message", (data) => {
+    const timer = setTimeout(() => {
+      ws.removeListener("message", onMessage)
+      reject(
+        new Error(
+          `waitForMessages: timed out after ${timeoutMs}ms (got ${msgs.length}/${count})`,
+        ),
+      )
+    }, timeoutMs)
+    const onMessage = (data: WebSocket.RawData): void => {
       msgs.push(data.toString())
-      if (msgs.length >= count) resolve(msgs)
-    })
+      if (msgs.length >= count) {
+        clearTimeout(timer)
+        ws.removeListener("message", onMessage)
+        resolve(msgs)
+      }
+    }
+    ws.on("message", onMessage)
   })
 }
 
