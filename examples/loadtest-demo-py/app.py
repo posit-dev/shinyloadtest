@@ -92,6 +92,8 @@ def server(input, output, session):
     @reactive.event(input.run)
     async def result():
         product = input.product()
+        if not product:
+            return None
         n = simulation_sizes[input.sim_size()]
 
         # Fake slow database read for historical sales data
@@ -114,6 +116,8 @@ def server(input, output, session):
     @render_plotly
     async def sim_plot():
         res = await result()
+        if res is None:
+            return None
 
         fig = go.Figure()
         fig.add_trace(
@@ -147,6 +151,8 @@ def server(input, output, session):
     @render.text
     async def result_text():
         res = await result()
+        if res is None:
+            return ""
         q05, q50, q95 = np.quantile(res["demand"], [0.05, 0.5, 0.95])
         return (
             f"Product: {res['product']} ({res['category']})\n"
