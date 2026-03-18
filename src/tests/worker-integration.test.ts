@@ -3,11 +3,11 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
-import { runEnduranceTest } from "../worker.js"
-import type { EnduranceTestConfig } from "../worker.js"
+import { runEnduranceTest } from "../replay/worker.js"
+import type { EnduranceTestConfig } from "../replay/worker.js"
 import { readRecordingFromString } from "../recording.js"
 import type { Logger } from "../logger.js"
-import { createOutputDir } from "../output.js"
+import { createOutputDir } from "../replay/output.js"
 
 // ---------------------------------------------------------------------------
 // Capturing logger

@@ -54,7 +54,7 @@ ui <- page_sidebar(
     ),
     input_task_button("run", "Run Forecast")
   ),
-  class = "bslib-page-dasboard",
+  class = "bslib-page-dashboard",
   shiny::useBusyIndicators(),
   card(
     min_height = 300,
@@ -84,6 +84,7 @@ server <- function(input, output, session) {
 
   # Step 3 -> Step 4: run forecast on button click
   result <- eventReactive(input$run, {
+    req(input$product)
     product <- input$product
     n <- simulation_sizes[[input$sim_size]]
 

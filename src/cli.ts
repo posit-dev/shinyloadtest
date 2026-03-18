@@ -2,11 +2,12 @@ import * as fs from "node:fs"
 import { Command } from "commander"
 import { bold, cyan, dim, green, magenta, yellow } from "yoctocolors"
 import { VERSION } from "./version.js"
-import { defaultOutputDir } from "./output.js"
+import { defaultOutputDir } from "./replay/output.js"
 import { parseLogLevel, LogLevel } from "./logger.js"
 import { getCreds } from "./auth.js"
 import { type Creds } from "./types.js"
 import { readRecording } from "./recording.js"
+import { type RecordOptions } from "./record/record.js"
 
 // ---------------------------------------------------------------------------
 // ParsedArgs
@@ -86,10 +87,18 @@ export function serializeArgs(args: ParsedArgs): {
 }
 
 // ---------------------------------------------------------------------------
+// CLI result discriminated union
+// ---------------------------------------------------------------------------
+
+export type CliResult =
+  | { command: "replay"; args: ParsedArgs }
+  | { command: "record"; options: RecordOptions }
+
+// ---------------------------------------------------------------------------
 // Argument parsing
 // ---------------------------------------------------------------------------
 
-export function parseArgs(argv?: string[]): ParsedArgs {
+export function parseArgs(argv?: string[]): CliResult {
   const program = new Command()
 
   const colorArgument = (str: string): string => {
@@ -107,7 +116,65 @@ export function parseArgs(argv?: string[]): ParsedArgs {
     .description("Load testing tool for Shiny applications.")
     .version(VERSION)
 
-  let result: ParsedArgs | undefined
+  let result: CliResult | undefined
+
+  const recordCmd = program
+    .command("record")
+    .configureHelp({
+      styleTitle: (str) => bold(str),
+      styleArgumentTerm: (str) => colorArgument(str),
+      styleArgumentText: (str) => colorArgument(str),
+      styleOptionTerm: (str) => cyan(str),
+    })
+    .description(
+      "Record a Shiny application session for later replay.\n\n" +
+        "Starts a local reverse proxy. Navigate your browser through the proxy\n" +
+        "to interact with the Shiny application; all WebSocket and HTTP traffic\n" +
+        "is captured to a recording file.\n\n" +
+        dim("Example:") +
+        "\n" +
+        `  ${cyan("$")} shinyloadtest record https://rsc.example.com/app`,
+    )
+    .argument("<app-url>", "URL of the Shiny application to record")
+    .option("--port <n>", "Local proxy port", "8600")
+    .option("--host <host>", "Local proxy host", "127.0.0.1")
+    .option("--output <file>", "Output recording file", "recording.log")
+    .option("--open", "Open browser automatically", false)
+    .addHelpText(
+      "after",
+      `\n${bold("Environment variables:")}\n` +
+        `  ${yellow("SHINYLOADTEST_USER")}              Username for SSP or Connect auth\n` +
+        `  ${yellow("SHINYLOADTEST_PASS")}              Password for SSP or Connect auth\n` +
+        `  ${yellow("SHINYLOADTEST_CONNECT_API_KEY")}   Posit Connect API key\n` +
+        `\n${dim("  Legacy SHINYCANNON_* environment variables are also supported.")}`,
+    )
+    .action(
+      (
+        targetUrl: string,
+        opts: {
+          port: string
+          host: string
+          output: string
+          open: boolean
+        },
+      ) => {
+        const port = Number(opts.port)
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new Error(`Invalid port value: ${opts.port}`)
+        }
+
+        result = {
+          command: "record",
+          options: {
+            targetUrl,
+            port,
+            host: opts.host,
+            output: opts.output,
+            open: opts.open,
+          },
+        }
+      },
+    )
 
   const replayCmd = program
     .command("replay")
@@ -231,17 +298,20 @@ export function parseArgs(argv?: string[]): ParsedArgs {
         }
 
         result = {
-          recordingPath,
-          appUrl,
-          workers,
-          loadedDurationMinutes,
-          startInterval,
-          headers,
-          outputDir: opts.outputDir,
-          overwriteOutput: opts.overwriteOutput,
-          debugLog: opts.debugLog,
-          logLevel: parseLogLevel(opts.logLevel),
-          creds: getCreds(),
+          command: "replay",
+          args: {
+            recordingPath,
+            appUrl,
+            workers,
+            loadedDurationMinutes,
+            startInterval,
+            headers,
+            outputDir: opts.outputDir,
+            overwriteOutput: opts.overwriteOutput,
+            debugLog: opts.debugLog,
+            logLevel: parseLogLevel(opts.logLevel),
+            creds: getCreds(),
+          },
         }
       },
     )
@@ -257,6 +327,10 @@ export function parseArgs(argv?: string[]): ParsedArgs {
   // Show replay help when invoked as `shinyloadtest replay` with no further args
   if (userArgs.length === 1 && userArgs[0] === "replay") {
     replayCmd.help()
+  }
+
+  if (userArgs.length === 1 && userArgs[0] === "record") {
+    recordCmd.help()
   }
 
   program.parse(raw)

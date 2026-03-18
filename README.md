@@ -1,8 +1,8 @@
 # shinyloadtest
 
-A load-generation tool for [Shiny](https://shiny.posit.co/) applications.
-shinyloadtest replays recorded sessions against a deployed Shiny app, simulating
-concurrent users to measure application performance under load.
+A load-testing tool for [Shiny](https://shiny.posit.co/) applications.
+shinyloadtest records a user session and replays it with concurrent workers
+to measure application performance under load.
 
 ## Installation
 
@@ -20,13 +20,49 @@ Or run directly with npx:
 npx @posit-dev/shinyloadtest --help
 ```
 
-## Usage
+## Quick Start
 
 ```bash
-shinyloadtest replay recording.log https://example.com/app [options]
+# 1. Record a session against a running Shiny app
+shinyloadtest record https://example.com/app
+
+# 2. Interact with the app in the browser at the printed proxy URL,
+#    then close the browser tab to stop recording.
+
+# 3. Replay the recording with multiple concurrent users
+shinyloadtest replay recording.log https://example.com/app --workers 5
 ```
 
-### Options
+## Recording
+
+```bash
+shinyloadtest record <app-url> [options]
+```
+
+Starts a local reverse proxy that sits between your browser and the Shiny
+application. All HTTP and WebSocket traffic is captured to a recording file.
+Navigate to the proxy URL printed on startup, interact with the app as a
+typical user would, then close the browser tab (or press Ctrl+C) to stop.
+
+### Record Options
+
+| Option | Description |
+|--------|-------------|
+| `--port <n>` | Local proxy port (default: `8600`) |
+| `--host <host>` | Local proxy host (default: `127.0.0.1`) |
+| `--output <file>` | Output recording file (default: `recording.log`) |
+| `--open` | Open browser automatically |
+
+## Replay
+
+```bash
+shinyloadtest replay <recording> [app-url] [options]
+```
+
+Replays a recorded session with one or more concurrent workers. If `app-url`
+is omitted, the target URL from the recording file is used.
+
+### Replay Options
 
 | Option | Description |
 |--------|-------------|
@@ -49,24 +85,19 @@ shinyloadtest supports authentication via environment variables:
 | `SHINYLOADTEST_PASS` | Password for Shiny Server Pro or Posit Connect |
 | `SHINYLOADTEST_CONNECT_API_KEY` | API key for Posit Connect |
 
+These variables are used during both recording and replay. If the app requires
+login and environment variables are not set, `record` will prompt interactively
+(TTY required).
+
 > **Note:** If the recording was made with a Connect API key, playback must
 > also use a Connect API key. Likewise, if the recording was made without an
 > API key, playback must not use one.
-
-## Example
-
-```bash
-shinyloadtest replay recording.log https://rsc.example.com/app \
-  --workers 5 \
-  --loaded-duration-minutes 10 \
-  --output-dir load-test-results
-```
 
 ## Companion Package
 
 shinyloadtest is designed to work with the
 [shinyloadtest](https://rstudio.github.io/shinyloadtest) R package.
-Use the R package to record sessions and analyze load test results.
+Use the R package to analyze load test results.
 
 ## Migration from shinycannon
 

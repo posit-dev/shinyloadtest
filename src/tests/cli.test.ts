@@ -172,7 +172,7 @@ describe("parseArgs", () => {
   })
 
   it("defaults startInterval to null when not provided", () => {
-    const args = parseArgs([
+    const result = parseArgs([
       "node",
       "script",
       "replay",
@@ -180,28 +180,34 @@ describe("parseArgs", () => {
       "http://example.com",
     ])
 
-    expect(args.startInterval).toBeNull()
-    expect(args.recordingPath).toBe(recordingFile)
-    expect(args.appUrl).toBe("http://example.com")
-    expect(args.workers).toBe(1)
-    expect(args.loadedDurationMinutes).toBe(5)
-    expect(args.logLevel).toBe(LogLevel.WARN)
+    expect(result.command).toBe("replay")
+    if (result.command !== "replay") return
+    expect(result.args.startInterval).toBeNull()
+    expect(result.args.recordingPath).toBe(recordingFile)
+    expect(result.args.appUrl).toBe("http://example.com")
+    expect(result.args.workers).toBe(1)
+    expect(result.args.loadedDurationMinutes).toBe(5)
+    expect(result.args.logLevel).toBe(LogLevel.WARN)
   })
 
   it("uses explicit app-url when provided", () => {
-    const args = parseArgs([
+    const result = parseArgs([
       "node",
       "script",
       "replay",
       recordingFile,
       "http://override.example.com",
     ])
-    expect(args.appUrl).toBe("http://override.example.com")
+    expect(result.command).toBe("replay")
+    if (result.command !== "replay") return
+    expect(result.args.appUrl).toBe("http://override.example.com")
   })
 
   it("resolves app-url from recording target_url when omitted", () => {
-    const args = parseArgs(["node", "script", "replay", recordingFile])
-    expect(args.appUrl).toBe("http://recorded-host.example.com")
+    const result = parseArgs(["node", "script", "replay", recordingFile])
+    expect(result.command).toBe("replay")
+    if (result.command !== "replay") return
+    expect(result.args.appUrl).toBe("http://recorded-host.example.com")
   })
 })
 

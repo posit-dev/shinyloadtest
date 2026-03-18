@@ -6,7 +6,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { CookieJar } from "tough-cookie"
-import { VERSION } from "./version.js"
+import { VERSION } from "../version.js"
 import {
   loginUrlFor,
   extractHiddenInputs,
@@ -15,27 +15,27 @@ import {
   loginSSP,
   getConnectCookies,
   connectApiKeyHeader,
-} from "./auth.js"
-import { detectServerType } from "./detect.js"
+} from "../auth.js"
+import { detectServerType } from "../detect.js"
 import {
   HttpClient,
   validateStatus,
   extractWorkerId,
   extractToken,
   getCookieString,
-} from "./http.js"
-import type { Logger } from "./logger.js"
+} from "../http.js"
+import type { Logger } from "../logger.js"
 import { SessionWriter } from "./output.js"
-import { normalizeMessage, parseMessage } from "./sockjs.js"
-import { replaceTokens, createTokenDictionary } from "./tokens.js"
-import type { Recording, RecordingEvent, Creds } from "./types.js"
+import { normalizeMessage, parseMessage } from "../sockjs.js"
+import { replaceTokens, createTokenDictionary } from "../tokens.js"
+import type { Recording, RecordingEvent, Creds } from "../types.js"
 import {
   ALLOWED_TOKENS,
   ServerType,
   hasUserPass,
   hasConnectApiKey,
-} from "./types.js"
-import { joinPaths, httpToWs } from "./url.js"
+} from "../types.js"
+import { joinPaths, httpToWs } from "../url.js"
 import { ShinyWebSocket } from "./websocket.js"
 
 // ---------------------------------------------------------------------------
