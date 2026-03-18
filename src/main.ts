@@ -2,17 +2,25 @@ import * as path from "node:path"
 import { CookieJar } from "tough-cookie"
 import { VERSION } from "./version.js"
 import { parseArgs, serializeArgs } from "./cli.js"
+import { record } from "./record/record.js"
 import { readRecording, recordingDuration } from "./recording.js"
 import { createLogger } from "./logger.js"
-import { createOutputDir } from "./output.js"
-import { runEnduranceTest } from "./worker.js"
+import { createOutputDir } from "./replay/output.js"
+import { runEnduranceTest } from "./replay/worker.js"
 import { SERVER_TYPE_NAMES, ServerType } from "./types.js"
 import { HttpClient } from "./http.js"
 import { detectServerType } from "./detect.js"
-import { TerminalUI } from "./ui.js"
+import { ReplayTerminalUI } from "./replay/ui.js"
 
 async function main(): Promise<void> {
-  const args = parseArgs()
+  const result = parseArgs()
+
+  if (result.command === "record") {
+    await record(result.options)
+    return
+  }
+
+  const args = result.args
 
   const recording = readRecording(args.recordingPath)
   const duration = recordingDuration(recording)
@@ -91,7 +99,7 @@ async function main(): Promise<void> {
   const { argsString, argsJson } = serializeArgs(args)
 
   const ui = process.stderr.isTTY
-    ? new TerminalUI({
+    ? new ReplayTerminalUI({
         version: VERSION,
         appUrl: args.appUrl,
         workers: args.workers,
