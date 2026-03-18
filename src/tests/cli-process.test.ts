@@ -45,7 +45,7 @@ let tempDir: string
 let recordingPath: string
 
 beforeAll(() => {
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-test-"))
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-test-"))
   recordingPath = path.join(tempDir, "recording.log")
   fs.writeFileSync(recordingPath, RECORDING_CONTENT, "utf-8")
 })

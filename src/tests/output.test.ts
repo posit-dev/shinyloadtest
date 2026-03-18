@@ -17,7 +17,7 @@ describe("createOutputDir", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-test-"))
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-test-"))
   })
 
   afterEach(() => {
@@ -90,7 +90,7 @@ describe("SessionWriter", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-test-"))
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-test-"))
     fs.mkdirSync(path.join(tmpDir, "sessions"))
   })
 

@@ -27,7 +27,7 @@ function createCapturingLogger(): { logger: Logger; messages: string[] } {
 }
 
 function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-auth-test-"))
+  return fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-auth-test-"))
 }
 
 function setupOutputDir(

@@ -31,7 +31,7 @@ async function runSessionAndReadCsv(
   mock: MockShinyServer,
   sessionId: number,
 ): Promise<{ lines: string[]; stats: Stats; events: string[] }> {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-err-"))
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-err-"))
   try {
     const recordingPath = path.join(tmpDir, "recording.log")
     fs.writeFileSync(recordingPath, mock.makeRecording())
@@ -98,7 +98,7 @@ describe("error handling", { timeout: 30_000 }, () => {
   })
 
   it("handles connection refused (ERR-01)", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-err-"))
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-err-"))
     tmpDirs.push(tmpDir)
 
     const unusedPort = await getUnusedPort()
@@ -201,7 +201,9 @@ describe("error handling", { timeout: 30_000 }, () => {
     const mock = new MockShinyServer()
     await mock.start()
     try {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-err-"))
+      const tmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "shinyloadtest-err-"),
+      )
       tmpDirs.push(tmpDir)
 
       // Recording with a REQ_POST that references a non-existent datafile
@@ -295,7 +297,9 @@ describe("error handling", { timeout: 30_000 }, () => {
     const mock = new MockShinyServer({ wsFloodCount: 60 })
     await mock.start()
     try {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-bc03-"))
+      const tmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "shinyloadtest-bc03-"),
+      )
       tmpDirs.push(tmpDir)
 
       const recordingPath = path.join(tmpDir, "recording.log")
@@ -382,7 +386,7 @@ describe("error handling", { timeout: 30_000 }, () => {
     await mock.start()
     try {
       const tmpDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), "shinycannon-abort-"),
+        path.join(os.tmpdir(), "shinyloadtest-abort-"),
       )
       tmpDirs.push(tmpDir)
 

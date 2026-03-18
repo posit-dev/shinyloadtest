@@ -18,7 +18,7 @@ beforeAll(async () => {
   mock = new MockShinyServer()
   await mock.start()
 
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-integ-"))
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-integ-"))
   recordingPath = path.join(tmpDir, "recording.log")
   fs.writeFileSync(recordingPath, mock.makeRecording())
   outputDir = path.join(tmpDir, "output")
@@ -197,7 +197,7 @@ describe("Session Integration", { timeout: 30000 }, () => {
     await altMock.start()
     let tmpDir2: string | undefined
     try {
-      tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-bc04-"))
+      tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-bc04-"))
       const recPath = path.join(tmpDir2, "recording.log")
       fs.writeFileSync(recPath, altMock.makeRecording())
       const outDir = path.join(tmpDir2, "output")
@@ -261,7 +261,7 @@ describe("Session Integration", { timeout: 30000 }, () => {
     await altMock.start()
     let tmpDir2: string | undefined
     try {
-      tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-bc04f-"))
+      tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-bc04f-"))
       const recPath = path.join(tmpDir2, "recording.log")
       fs.writeFileSync(recPath, altMock.makeRecording())
       const outDir = path.join(tmpDir2, "output")

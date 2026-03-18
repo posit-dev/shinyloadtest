@@ -56,7 +56,7 @@ async function runTest(
   mock: MockShinyServer,
   overrides: Partial<Omit<EnduranceTestConfig, "logger">> = {},
 ): Promise<RunTestResult> {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-worker-"))
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-worker-"))
   const recordingPath = path.join(tmpDir, "recording.log")
   fs.writeFileSync(recordingPath, mock.makeRecording())
   const outputDir = path.join(tmpDir, "output")

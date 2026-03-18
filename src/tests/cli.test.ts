@@ -153,7 +153,7 @@ describe("parseArgs", () => {
   let recordingFile: string
 
   beforeAll(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinycannon-cli-test-"))
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-cli-test-"))
     recordingFile = path.join(tmpDir, "recording.log")
     fs.writeFileSync(
       recordingFile,
