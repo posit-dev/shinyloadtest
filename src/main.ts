@@ -3,6 +3,7 @@ import { CookieJar } from "tough-cookie"
 import { VERSION } from "./version.js"
 import { parseArgs, serializeArgs } from "./cli.js"
 import { record } from "./record/record.js"
+import { report } from "./report/report.js"
 import { readRecording, recordingDuration } from "./recording.js"
 import { createLogger } from "./logger.js"
 import { createOutputDir } from "./replay/output.js"
@@ -17,6 +18,11 @@ async function main(): Promise<void> {
 
   if (result.command === "record") {
     await record(result.options)
+    return
+  }
+
+  if (result.command === "report") {
+    await report(result.options)
     return
   }
 
