@@ -21,14 +21,17 @@ ${CSS}
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <nav class="sidebar" id="sidebar">
       <h1 class="sidebar-title">shinyloadtest</h1>
-      <div class="sidebar-run-select" id="sidebar-run-select">
-        <label for="run-select">Run</label>
-        <select id="run-select"></select>
-      </div>
       <ul class="nav-list">
+        <li class="nav-group-label">Per Run</li>
+        <li>
+          <div class="sidebar-run-select" id="sidebar-run-select">
+            <select id="run-select" aria-label="Run"></select>
+          </div>
+        </li>
         <li><a href="#" class="nav-link active" data-section="sessions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>Sessions</a></li>
         <li><a href="#" class="nav-link" data-section="session-duration"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>Session Duration</a></li>
         <li><a href="#" class="nav-link" data-section="waterfall"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>Event Waterfall</a></li>
+        <li class="nav-group-label">All Runs</li>
         <li><a href="#" class="nav-link" data-section="latency"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Latency</a></li>
         <li><a href="#" class="nav-link" data-section="event-duration"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>Event Duration</a></li>
         <li><a href="#" class="nav-link" data-section="event-concurrency"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></svg>Event Concurrency</a></li>
@@ -124,7 +127,6 @@ ${CSS}
 
   <script type="module">
 import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/+esm";
-import * as aq from "https://cdn.jsdelivr.net/npm/arquero@7.2.1/+esm";
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 const RAW_DATA = ${dataJson};
@@ -315,20 +317,23 @@ body {
 
 .nav-link.active .nav-icon { opacity: 1; }
 
-/* Sidebar run selector */
-.sidebar-run-select {
-  padding: 0 1.5rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-run-select label {
+li.nav-group-label {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  padding: 0.75rem 1.5rem 0.25rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Sidebar run selector */
+.sidebar-run-select {
+  padding: 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sidebar-run-select select {
@@ -1031,14 +1036,14 @@ function enableTooltips(chartEl) {
       tooltip.textContent = text;
       tooltip.style.opacity = "1";
       const rect = parent.getBoundingClientRect();
-      tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 340) + "px";
+      tooltip.style.left = Math.max(8, Math.min(e.clientX + 12, window.innerWidth - tooltip.offsetWidth - 8)) + "px";
       tooltip.style.top = (rect.top - tooltip.offsetHeight - 6) + "px";
       if (parseFloat(tooltip.style.top) < 0) {
         tooltip.style.top = (rect.bottom + 6) + "px";
       }
     });
     parent.addEventListener("mousemove", (e) => {
-      tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 340) + "px";
+      tooltip.style.left = Math.max(8, Math.min(e.clientX + 12, window.innerWidth - tooltip.offsetWidth - 8)) + "px";
     });
     parent.addEventListener("mouseleave", () => {
       hideTimer = setTimeout(() => { tooltip.style.opacity = "0"; }, 500);
