@@ -3,7 +3,10 @@
   "version": "2.0.0-alpha.2",
   "description": "Load testing tool for Shiny applications",
   "type": "module",
-  "main": "dist/main.js",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/main.js"
+  },
   "bin": {
     "shinyloadtest": "dist/main.js",
     "shinycannon": "dist/shinycannon.js"
@@ -32,7 +35,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/posit-dev/shinyloadtest.git"
+    "url": "git+https://github.com/posit-dev/shinyloadtest.git"
   },
   "files": [
     "dist/"
