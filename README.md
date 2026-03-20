@@ -31,6 +31,9 @@ shinyloadtest record https://example.com/app
 
 # 3. Replay the recording with multiple concurrent users
 shinyloadtest replay recording.log https://example.com/app --workers 5
+
+# 4. Generate a performance report
+shinyloadtest report
 ```
 
 ## Recording
@@ -75,6 +78,34 @@ is omitted, the target URL from the recording file is used.
 | `--debug-log` | Write verbose debug log |
 | `--log-level <level>` | Console log level: `debug`, `info`, `warn`, `error` (default: `warn`) |
 
+## Report
+
+```bash
+shinyloadtest report [dirs...] [options]
+```
+
+Generates a performance report from the session logs produced by `replay`.
+If no directories are specified, any `test-logs-*` directories in the current
+working directory that contain a `sessions/` subdirectory are used
+automatically.
+
+The default HTML report is a self-contained interactive dashboard with charts
+covering session timelines, latency, event duration, concurrency impact, and
+more.
+
+### Report Options
+
+| Option | Description |
+|--------|-------------|
+| `--format <format>` | Output format: `html` (default), `text` (Markdown tables), or `json` |
+| `--output <file>` | Save report to a file instead of serving/printing |
+| `--no-open` | Do not open the HTML report in the browser |
+
+When using the default `html` format without `--output`, the report is served
+on a local HTTP server and opened in your browser. With `--output`, the report
+is written to the specified file. The `text` and `json` formats print to stdout
+unless `--output` is provided.
+
 ## Authentication
 
 shinyloadtest supports authentication via environment variables:
@@ -95,9 +126,9 @@ login and environment variables are not set, `record` will prompt interactively
 
 ## Companion Package
 
-shinyloadtest is designed to work with the
-[shinyloadtest](https://rstudio.github.io/shinyloadtest) R package.
-Use the R package to analyze load test results.
+Report generation is built in via `shinyloadtest report`. The
+[shinyloadtest](https://rstudio.github.io/shinyloadtest) R package can still be
+used for custom analysis of load test results in R.
 
 ## Migration from shinycannon
 

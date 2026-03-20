@@ -16,6 +16,11 @@ published as `@posit-dev/shinyloadtest` on npm.
   and `SHINYLOADTEST_CONNECT_API_KEY`. The legacy `SHINYCANNON_*` names are
   still accepted as fallbacks.
 
+* Added `shinyloadtest report` to generate performance reports from load test
+  results. Supports HTML (interactive dashboard), text (Markdown tables), and
+  JSON output formats. The HTML report is self-contained and includes charts
+  for session timelines, latency, event duration, and concurrency impact.
+
 * Added a live terminal UI that displays per-worker status, session counts, and
   event throughput stats during the loaded phase.
 
