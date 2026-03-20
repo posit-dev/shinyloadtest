@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>shinyloadtest Report</title>
+    <script
+      id="report-data"
+      type="application/json"
+    >
+      /*__REPORT_DATA__*/
+    </script>
+  </head>
+  <body>
+    <div class="layout">
+      <button
+        class="mobile-menu-toggle"
+        id="menu-toggle"
+        aria-label="Toggle navigation"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 20 20"
+        >
+          <rect
+            y="3"
+            width="20"
+            height="2"
+            rx="1"
+          />
+          <rect
+            y="9"
+            width="20"
+            height="2"
+            rx="1"
+          />
+          <rect
+            y="15"
+            width="20"
+            height="2"
+            rx="1"
+          />
+        </svg>
+      </button>
+      <div
+        class="sidebar-overlay"
+        id="sidebar-overlay"
+      ></div>
+      <nav
+        class="sidebar"
+        id="sidebar"
+      >
+        <h1 class="sidebar-title">shinyloadtest</h1>
+        <ul class="nav-list">
+          <li class="nav-group-label">Per Run</li>
+          <li>
+            <div
+              class="sidebar-run-select"
+              id="sidebar-run-select"
+            >
+              <select
+                id="run-select"
+                aria-label="Run"
+              ></select>
+            </div>
+          </li>
+          <li>
+            <a
+              href="#"
+              class="nav-link active"
+              data-section="sessions"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect
+                  width="20"
+                  height="8"
+                  x="2"
+                  y="2"
+                  rx="2"
+                  ry="2"
+                />
+                <rect
+                  width="20"
+                  height="8"
+                  x="2"
+                  y="14"
+                  rx="2"
+                  ry="2"
+                />
+                <line
+                  x1="6"
+                  x2="6.01"
+                  y1="6"
+                  y2="6"
+                />
+                <line
+                  x1="6"
+                  x2="6.01"
+                  y1="18"
+                  y2="18"
+                /></svg
+              >Sessions</a
+            >
+          </li>
+          <li>
+            <a
+              href="#"
+              class="nav-link"
+              data-section="session-duration"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 7v10" />
+                <path d="M6 5v14" />
+                <rect
+                  width="12"
+                  height="18"
+                  x="10"
+                  y="3"
+                  rx="2"
+                /></svg
+              >Session Duration</a
+            >
+          </li>
+          <li>
+            <a
+              href="#"
+              class="nav-link"
+              data-section="waterfall"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect
+                  width="18"
+                  height="18"
+                  x="3"
+                  y="3"
+                  rx="2"
+                />
+                <path d="M9 3v18" />
+                <path d="M15 3v18" /></svg
+              >Event Waterfall</a
+            >
+          </li>
+          <li class="nav-group-label">All Runs</li>
+          <li>
+            <a
+              href="#"
+              class="nav-link"
+              data-section="latency"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <polyline points="12 6 12 12 16 14" /></svg
+              >Latency</a
+            >
+          </li>
+          <li>
+            <a
+              href="#"
+              class="nav-link"
+              data-section="event-duration"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line
+                  x1="10"
+                  x2="14"
+                  y1="2"
+                  y2="2"
+                />
+                <line
+                  x1="12"
+                  x2="15"
+                  y1="14"
+                  y2="11"
+                />
+                <circle
+                  cx="12"
+                  cy="14"
+                  r="8"
+                /></svg
+              >Event Duration</a
+            >
+          </li>
+          <li>
+            <a
+              href="#"
+              class="nav-link"
+              data-section="event-concurrency"
+              ><svg
+                class="nav-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle
+                  cx="12"
+                  cy="18"
+                  r="3"
+                />
+                <circle
+                  cx="6"
+                  cy="6"
+                  r="3"
+                />
+                <circle
+                  cx="18"
+                  cy="6"
+                  r="3"
+                />
+                <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+                <path d="M12 12v3" /></svg
+              >Event Concurrency</a
+            >
+          </li>
+        </ul>
+      </nav>
+      <main class="content">
+        <section
+          id="sessions"
+          class="section active"
+        >
+          <div class="section-desc">
+            <p id="sessions-desc">
+              Simulated users executing back-to-back sessions. Warmup or
+              cooldown sessions (desaturated) start before or end after the
+              vertical dotted line. Narrower event bars mean better performance.
+            </p>
+          </div>
+          <div
+            id="sessions-chart"
+            class="chart-area"
+          ></div>
+        </section>
+        <section
+          id="session-duration"
+          class="section"
+        >
+          <div class="section-desc">
+            <p id="session-duration-desc">
+              Maintenance sessions ordered from fastest to slowest completion
+              time. The red line marks how long the original recording session
+              took to complete. Sessions should end around the same time as each
+              other for consistent behavior.
+            </p>
+          </div>
+          <div
+            id="session-duration-chart"
+            class="chart-area"
+          ></div>
+        </section>
+        <section
+          id="waterfall"
+          class="section"
+        >
+          <div class="section-desc">
+            <p>
+              Each session is represented with a line that cascades downward
+              from each event. As time progresses, the line moves to the right.
+              Consistent behavior is represented with parallel lines, whereas
+              inconsistent behavior has lines jut arbitrarily to the right.
+              Warmup and cooldown sessions are included as grey lines.
+            </p>
+          </div>
+          <div
+            id="waterfall-chart"
+            class="chart-area"
+          ></div>
+        </section>
+        <section
+          id="latency"
+          class="section"
+        >
+          <div class="section-desc">
+            <div class="sub-tabs">
+              <button
+                class="sub-tab active"
+                data-subtab="http-latency"
+              >
+                Total HTTP
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="ws-latency"
+              >
+                Maximum WebSocket
+              </button>
+            </div>
+          </div>
+          <div
+            id="http-latency"
+            class="chart-area sub-content active"
+          >
+            <p class="chart-desc">
+              Total HTTP and supporting files (JS/CSS) latency (load time) is
+              displayed for each session. Each vertical bar represents the
+              amount of time a session's Shiny application had to wait before it
+              could ask the server for information. A reasonable time to wait
+              has been set to 5s. Warmup and cooldown sessions are displayed
+              outside the dotted maintenance period lines.
+            </p>
+            <div id="http-latency-chart"></div>
+          </div>
+          <div
+            id="ws-latency"
+            class="chart-area sub-content"
+          >
+            <p class="chart-desc">
+              Maximum WebSocket latency (calculation time) is displayed for each
+              session. The maximum time is shown to convey the longest amount of
+              time a user would have to wait for a response from the Shiny
+              server. Warmup and cooldown sessions are displayed outside the
+              dotted maintenance period lines.
+            </p>
+            <div id="ws-latency-chart"></div>
+          </div>
+        </section>
+        <section
+          id="event-duration"
+          class="section"
+        >
+          <div class="section-desc">
+            <div class="sub-tabs">
+              <button
+                class="sub-tab active"
+                data-subtab="dur-max"
+              >
+                Slowest max
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="dur-min"
+              >
+                Slowest min
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="dur-mean-diff"
+                id="dur-mean-diff-tab"
+                style="display: none"
+              >
+                Largest mean difference
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="dur-table"
+              >
+                Data table
+              </button>
+            </div>
+          </div>
+          <div
+            id="dur-max"
+            class="chart-area sub-content active"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the slowest
+              <strong>maximum</strong> time within each plot.
+            </p>
+            <div id="dur-max-grid"></div>
+          </div>
+          <div
+            id="dur-min"
+            class="chart-area sub-content"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the slowest
+              <strong>minimum</strong> time within each plot.
+            </p>
+            <div id="dur-min-grid"></div>
+          </div>
+          <div
+            id="dur-mean-diff"
+            class="chart-area sub-content"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the largest
+              <strong>mean difference</strong> across runs.
+            </p>
+            <div id="dur-mean-diff-grid"></div>
+          </div>
+          <div
+            id="dur-table"
+            class="chart-area sub-content"
+          >
+            <div id="dur-table-content"></div>
+          </div>
+        </section>
+        <section
+          id="event-concurrency"
+          class="section"
+        >
+          <div class="section-desc">
+            <div class="sub-tabs">
+              <button
+                class="sub-tab active"
+                data-subtab="conc-slope"
+              >
+                Largest slope
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="conc-intercept"
+              >
+                Largest intercept
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="conc-error"
+              >
+                Largest error
+              </button>
+              <button
+                class="sub-tab"
+                data-subtab="conc-table"
+              >
+                Data table
+              </button>
+            </div>
+          </div>
+          <div
+            id="conc-slope"
+            class="chart-area sub-content active"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the largest
+              <strong>slope magnitude</strong> found when fitting a line to each
+              run.
+            </p>
+            <div id="conc-slope-grid"></div>
+          </div>
+          <div
+            id="conc-intercept"
+            class="chart-area sub-content"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the largest
+              <strong>intercept magnitude</strong> found when fitting a line to
+              each run.
+            </p>
+            <div id="conc-intercept-grid"></div>
+          </div>
+          <div
+            id="conc-error"
+            class="chart-area sub-content"
+          >
+            <p class="chart-desc">
+              Event plots are arranged by the largest
+              <strong>residual error</strong> found when fitting a line to each
+              run.
+            </p>
+            <div id="conc-error-grid"></div>
+          </div>
+          <div
+            id="conc-table"
+            class="chart-area sub-content"
+          >
+            <div id="conc-table-content"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script
+      type="module"
+      src="./main.ts"
+    ></script>
+  </body>
+</html>

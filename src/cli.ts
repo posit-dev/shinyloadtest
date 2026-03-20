@@ -1,5 +1,5 @@
 import * as fs from "node:fs"
-import { Command } from "commander"
+import { Command, InvalidArgumentError } from "commander"
 import { bold, cyan, dim, green, magenta, yellow } from "yoctocolors"
 import { VERSION } from "./version.js"
 import { defaultOutputDir } from "./replay/output.js"
@@ -8,6 +8,7 @@ import { getCreds } from "./auth.js"
 import { type Creds } from "./types.js"
 import { readRecording } from "./recording.js"
 import { type RecordOptions } from "./record/record.js"
+import { type ReportOptions } from "./report/report.js"
 
 // ---------------------------------------------------------------------------
 // ParsedArgs
@@ -93,6 +94,7 @@ export function serializeArgs(args: ParsedArgs): {
 export type CliResult =
   | { command: "replay"; args: ParsedArgs }
   | { command: "record"; options: RecordOptions }
+  | { command: "report"; options: ReportOptions }
 
 // ---------------------------------------------------------------------------
 // Argument parsing
@@ -316,6 +318,64 @@ export function parseArgs(argv?: string[]): CliResult {
       },
     )
 
+  const reportCmd = program
+    .command("report")
+    .configureHelp({
+      styleTitle: (str) => bold(str),
+      styleOptionTerm: (str) => cyan(str),
+    })
+    .description(
+      "Generate an interactive HTML report from load test results.\n\n" +
+        "By default, starts a local server and opens the report in your browser.\n" +
+        "Use --output to save to a file instead.\n\n" +
+        "If no directories are specified, auto-detects test-logs-* directories\n" +
+        "in the current working directory.\n\n" +
+        dim("Examples:") +
+        "\n" +
+        `  ${cyan("$")} shinyloadtest report\n` +
+        `  ${cyan("$")} shinyloadtest report test-logs-2024-01-01T00_00_00.000Z\n` +
+        `  ${cyan("$")} shinyloadtest report run1/ run2/ --output comparison.html\n` +
+        `  ${cyan("$")} shinyloadtest report --format text\n` +
+        `  ${cyan("$")} shinyloadtest report --format json | jq .`,
+    )
+    .argument("[dirs...]", "Test output directories (auto-detected if omitted)")
+    .option(
+      "--format <format>",
+      "Output format: html, text, or json",
+      (value: string) => {
+        const validFormats = ["html", "text", "json"]
+        if (!validFormats.includes(value)) {
+          throw new InvalidArgumentError(
+            `Must be one of: ${validFormats.join(", ")}`,
+          )
+        }
+        return value as "html" | "text" | "json"
+      },
+      "html",
+    )
+    .option("--output <file>", "Save report to file instead of serving")
+    .option("--no-open", "Do not open report in browser")
+    .action(
+      (
+        dirs: string[],
+        opts: {
+          format: "html" | "text" | "json"
+          output?: string
+          open: boolean
+        },
+      ) => {
+        result = {
+          command: "report",
+          options: {
+            dirs,
+            format: opts.format,
+            output: opts.output,
+            open: opts.open,
+          },
+        }
+      },
+    )
+
   const raw = argv ?? process.argv
   const userArgs = raw.slice(2)
 
@@ -332,6 +392,9 @@ export function parseArgs(argv?: string[]): CliResult {
   if (userArgs.length === 1 && userArgs[0] === "record") {
     recordCmd.help()
   }
+
+  // report command: no help guard needed since [dirs...] is optional
+  void reportCmd
 
   program.parse(raw)
 

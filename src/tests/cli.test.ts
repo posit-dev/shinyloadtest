@@ -268,3 +268,63 @@ describe("start interval default", () => {
     expect(computed).toBe(500)
   })
 })
+
+// ---------------------------------------------------------------------------
+// report command
+// ---------------------------------------------------------------------------
+
+describe("report command", () => {
+  function parseReport(args: string[]) {
+    const result = parseArgs(["node", "shinyloadtest", "report", ...args])
+    if (result.command !== "report") throw new Error("expected report command")
+    return result
+  }
+
+  it("defaults format to html", () => {
+    const result = parseReport([])
+    expect(result.options.format).toBe("html")
+  })
+
+  it("accepts --format text", () => {
+    const result = parseReport(["--format", "text"])
+    expect(result.options.format).toBe("text")
+  })
+
+  it("accepts --format json", () => {
+    const result = parseReport(["--format", "json"])
+    expect(result.options.format).toBe("json")
+  })
+
+  it("rejects invalid format", () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit called")
+    })
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true)
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      expect(() =>
+        parseArgs(["node", "shinyloadtest", "report", "--format", "csv"]),
+      ).toThrow("process.exit called")
+      const stderrOutput = stderrSpy.mock.calls
+        .map((c) => String(c[0]))
+        .join("")
+      expect(stderrOutput).toContain("Must be one of: html, text, json")
+    } finally {
+      consoleSpy.mockRestore()
+      stderrSpy.mockRestore()
+      exitSpy.mockRestore()
+    }
+  })
+
+  it("passes directories as dirs", () => {
+    const result = parseReport(["dir1", "dir2"])
+    expect(result.options.dirs).toEqual(["dir1", "dir2"])
+  })
+
+  it("passes --output option", () => {
+    const result = parseReport(["--output", "report.html"])
+    expect(result.options.output).toBe("report.html")
+  })
+})
