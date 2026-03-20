@@ -9,7 +9,8 @@
     "shinycannon": "dist/shinycannon.js"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "npm run build:report && tsup",
+    "build:report": "vite build --config src/report/app/vite.config.ts",
     "dev": "tsx src/main.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
@@ -34,13 +35,16 @@
     "dist/"
   ],
   "dependencies": {
+    "@observablehq/plot": "^0.6.17",
     "commander": "^13.1.0",
+    "d3": "^7.9.0",
     "ora": "^9.3.0",
     "tough-cookie": "^5.1.2",
     "ws": "^8.18.1",
     "yoctocolors": "^2.1.2"
   },
   "devDependencies": {
+    "@types/d3": "^7.4.3",
     "@types/node": "^20.17.24",
     "@types/tough-cookie": "^4.0.5",
     "@types/ws": "^8.18.0",
@@ -52,6 +56,8 @@
     "tsup": "^8.4.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
+    "vite": "^7.3.1",
+    "vite-plugin-singlefile": "^2.3.2",
     "vitest": "^3.0.9"
   }
 }

@@ -8,6 +8,7 @@ test-logs-*
 node_modules/
 dist/
 *.tsbuildinfo
+src/report/app/dist/
 
 # Kotlin / JVM (archived)
 target/

@@ -11,6 +11,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   dts: false,
+  loader: { ".html": "text" },
   banner: {
     js: "#!/usr/bin/env node",
   },
