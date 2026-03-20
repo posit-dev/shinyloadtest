@@ -5,4 +5,5 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     testTimeout: 30000,
   },
+  assetsInclude: ["**/*.html"],
 });
