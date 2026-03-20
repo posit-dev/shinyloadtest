@@ -27,8 +27,10 @@ export class MockShinyServer {
   private sessionCounter = 0
   private connections: Set<WebSocket> = new Set()
   private httpConnections: Set<import("node:net").Socket> = new Set()
+  private options: MockShinyServerOptions
 
-  constructor(private options: MockShinyServerOptions = {}) {
+  constructor(options: MockShinyServerOptions = {}) {
+    this.options = options
     this.server = http.createServer(this.handleHttp.bind(this))
     this.wss = new WebSocketServer({ server: this.server })
     this.wss.on("connection", this.handleWs.bind(this))

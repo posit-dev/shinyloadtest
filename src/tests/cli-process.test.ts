@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 
-const MAIN_JS = path.resolve("dist/main.js")
+const MAIN_JS = path.resolve("dist/main.mjs")
 const FAKE_URL = "http://127.0.0.1:65535"
 
 // Minimal valid recording content

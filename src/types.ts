@@ -5,13 +5,15 @@
 // Server Type
 // ---------------------------------------------------------------------------
 
-export enum ServerType {
-  RSC = "RSC",
-  SSP = "SSP",
-  SAI = "SAI",
-  SHN = "SHN",
-  UNK = "UNK",
-}
+export const ServerType = {
+  RSC: "RSC",
+  SSP: "SSP",
+  SAI: "SAI",
+  SHN: "SHN",
+  UNK: "UNK",
+} as const
+
+export type ServerType = (typeof ServerType)[keyof typeof ServerType]
 
 export const SERVER_TYPE_NAMES: ReadonlyMap<ServerType, string> = new Map([
   [ServerType.RSC, "RStudio Server Connect"],

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
 
