@@ -10,9 +10,24 @@ import { renderEventDuration } from "./charts/event-duration"
 import { renderEventConcurrency } from "./charts/event-concurrency"
 import * as d3 from "d3"
 
-const rawData: RawData = JSON.parse(
-  document.getElementById("report-data")!.textContent!
-)
+let rawData: RawData
+
+if (import.meta.env.DEV) {
+  try {
+    const res = await fetch("/__dev_data__.json")
+    if (res.ok) {
+      rawData = (await res.json()) as RawData
+    } else {
+      rawData = (await import("./fixtures/demo1.json")).default as RawData
+    }
+  } catch {
+    rawData = (await import("./fixtures/demo1.json")).default as RawData
+  }
+} else {
+  rawData = JSON.parse(
+    document.getElementById("report-data")!.textContent!
+  ) as RawData
+}
 
 const runs = rawData.runs.map(processRun)
 const recordingDuration = rawData.recording.duration / 1000
@@ -43,7 +58,12 @@ function renderPerRun() {
     ["Waterfall", renderWaterfall],
   ]
   for (const [name, fn] of perRun) {
-    try { fn(state) } catch (e) { console.error(`${name} render error:`, e) }
+    try {
+      fn(state)
+    } catch (e) {
+      console.error(`${name} render error:`, e)
+      if (import.meta.env.DEV) throw e
+    }
   }
 }
 
@@ -55,7 +75,12 @@ function renderAll() {
     ["Event Concurrency", renderEventConcurrency],
   ]
   for (const [name, fn] of allRun) {
-    try { fn(state) } catch (e) { console.error(`${name} render error:`, e) }
+    try {
+      fn(state)
+    } catch (e) {
+      console.error(`${name} render error:`, e)
+      if (import.meta.env.DEV) throw e
+    }
   }
 }
 

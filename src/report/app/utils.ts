@@ -88,11 +88,12 @@ export function makeGridPicker(
   picker.className = "grid-picker"
   picker.innerHTML = "Show <input type='number' value='" + count + "' min='1' max='" + totalEvents + "'> of " + totalEvents + " events"
   const input = picker.querySelector("input")!
-  input.addEventListener("input", () => {
-    const val = Math.max(1, Math.min(totalEvents, Number(input.value) || count))
-    onChangeCallback(val)
-  })
-  return { picker, getCount: () => Math.max(1, Math.min(totalEvents, Number(input.value) || count)) }
+  const clamp = () => {
+    const n = Number(input.value)
+    return Math.max(1, Math.min(totalEvents, Number.isFinite(n) ? n : count))
+  }
+  input.addEventListener("input", () => onChangeCallback(clamp()))
+  return { picker, getCount: clamp }
 }
 
 export function makeSortableTable(
