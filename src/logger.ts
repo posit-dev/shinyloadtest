@@ -1,12 +1,22 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-  SILENT = 4,
+export const LogLevel = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+  SILENT: 4,
+} as const
+
+export type LogLevel = (typeof LogLevel)[keyof typeof LogLevel]
+
+export const LOG_LEVEL_NAMES: Record<LogLevel, string> = {
+  [LogLevel.DEBUG]: "debug",
+  [LogLevel.INFO]: "info",
+  [LogLevel.WARN]: "warn",
+  [LogLevel.ERROR]: "error",
+  [LogLevel.SILENT]: "silent",
 }
 
 const LEVEL_LABELS: Record<LogLevel, string> = {

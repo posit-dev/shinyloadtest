@@ -3,7 +3,7 @@ import { Command, InvalidArgumentError } from "commander"
 import { bold, cyan, dim, green, magenta, yellow } from "yoctocolors"
 import { VERSION } from "./version.js"
 import { defaultOutputDir } from "./replay/output.js"
-import { parseLogLevel, LogLevel } from "./logger.js"
+import { parseLogLevel, LogLevel, LOG_LEVEL_NAMES } from "./logger.js"
 import { getCreds } from "./auth.js"
 import { type Creds } from "./types.js"
 import { readRecording } from "./recording.js"
@@ -67,7 +67,7 @@ export function serializeArgs(args: ParsedArgs): {
   if (args.debugLog) {
     parts.push("--debug-log")
   }
-  parts.push(`--log-level ${LogLevel[args.logLevel]!.toLowerCase()}`)
+  parts.push(`--log-level ${LOG_LEVEL_NAMES[args.logLevel]}`)
 
   const argsString = parts.join(" ")
 
@@ -80,7 +80,7 @@ export function serializeArgs(args: ParsedArgs): {
     outputDir: args.outputDir,
     overwriteOutput: args.overwriteOutput,
     debugLog: args.debugLog,
-    logLevel: LogLevel[args.logLevel],
+    logLevel: LOG_LEVEL_NAMES[args.logLevel],
   }
   const argsJson = JSON.stringify(jsonObj)
 

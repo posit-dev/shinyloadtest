@@ -78,7 +78,7 @@ describe("serializeArgs", () => {
     expect(parsed.loadedDurationMinutes).toBe(10)
     expect(parsed.startInterval).toBeNull()
     expect(parsed.outputDir).toBe("/tmp/output")
-    expect(parsed.logLevel).toBe("WARN")
+    expect(parsed.logLevel).toBe("warn")
   })
 
   it("does not include --start-interval when null", () => {
