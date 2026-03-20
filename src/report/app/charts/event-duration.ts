@@ -7,24 +7,40 @@ import type { AppState } from "../types"
 export function renderEventDuration(state: AppState): void {
   const allData = state.runs.flatMap((run, ri) =>
     run.paired
-      .filter(d => d.maintenance)
-      .map(d => ({
+      .filter((d) => d.maintenance)
+      .map((d) => ({
         ...d,
         run_name: run.name,
         run_idx: ri,
         label: state.getRecordingLabel(d.input_line_number),
-      }))
+      })),
   )
   if (allData.length === 0) return
 
-  const byEventRun = new Map<string, { label: string; input_line_number: number; event_base: string; run_idx: number; times: number[] }>()
+  const byEventRun = new Map<
+    string,
+    {
+      label: string
+      input_line_number: number
+      event_base: string
+      run_idx: number
+      times: number[]
+    }
+  >()
   for (const d of allData) {
     const key = d.input_line_number + "|" + d.run_idx
-    if (!byEventRun.has(key)) byEventRun.set(key, { label: d.label, input_line_number: d.input_line_number, event_base: d.event_base, run_idx: d.run_idx, times: [] })
+    if (!byEventRun.has(key))
+      byEventRun.set(key, {
+        label: d.label,
+        input_line_number: d.input_line_number,
+        event_base: d.event_base,
+        run_idx: d.run_idx,
+        times: [],
+      })
     byEventRun.get(key)!.times.push(d.time)
   }
 
-  const perRunStats = [...byEventRun.values()].map(g => {
+  const perRunStats = [...byEventRun.values()].map((g) => {
     const times = g.times.sort((a, b) => a - b)
     const n = times.length
     const mid = Math.floor(n / 2)
@@ -48,16 +64,16 @@ export function renderEventDuration(state: AppState): void {
   }
 
   const stats = [...byEvent.entries()].map(([lineNum, runStats]) => {
-    const means = runStats.map(s => s.mean_time)
+    const means = runStats.map((s) => s.mean_time)
     return {
       label: runStats[0].label,
       input_line_number: lineNum,
       event_base: runStats[0].event_base,
-      min_time: d3.min(runStats, s => s.min_time)!,
-      max_time: d3.max(runStats, s => s.max_time)!,
+      min_time: d3.min(runStats, (s) => s.min_time)!,
+      max_time: d3.max(runStats, (s) => s.max_time)!,
       mean_time: d3.mean(means)!,
-      median_time: d3.median(runStats.flatMap(s => [s.median_time]))!,
-      count: d3.sum(runStats, s => s.count),
+      median_time: d3.median(runStats.flatMap((s) => [s.median_time]))!,
+      count: d3.sum(runStats, (s) => s.count),
       mean_diff: means.length > 1 ? d3.max(means)! - d3.min(means)! : 0,
     }
   })
@@ -77,9 +93,14 @@ export function renderEventDuration(state: AppState): void {
     grids.push({ id: "dur-mean-diff-grid", ordered: byMeanDiff })
   }
 
-  type StatEntry = typeof stats[number]
+  type StatEntry = (typeof stats)[number]
 
-  function buildGrid(container: HTMLElement, pickerEl: HTMLElement, orderedStats: StatEntry[], maxItems: number) {
+  function buildGrid(
+    container: HTMLElement,
+    pickerEl: HTMLElement,
+    orderedStats: StatEntry[],
+    maxItems: number,
+  ) {
     container.innerHTML = ""
     container.appendChild(pickerEl)
     const grid = document.createElement("div")
@@ -96,26 +117,48 @@ export function renderEventDuration(state: AppState): void {
       title.title = stat.label
       item.appendChild(title)
 
-      const eventData = allData.filter(d => d.input_line_number === stat.input_line_number)
+      const eventData = allData.filter(
+        (d) => d.input_line_number === stat.input_line_number,
+      )
 
       let chart: SVGElement | HTMLElement
       if (state.runs.length > 1) {
         chart = Plot.plot({
-          height: 160, width: 260, marginLeft: 40, marginRight: 10,
+          height: 160,
+          width: 260,
+          marginLeft: 40,
+          marginRight: 10,
           x: { axis: null, padding: 0.15 },
           y: { label: "Time (sec)", grid: true },
-          color: { domain: state.runs.map(r => r.name), range: state.runs.map((_, i) => RUN_COLORS[i % RUN_COLORS.length]) },
+          color: {
+            domain: state.runs.map((r) => r.name),
+            range: state.runs.map((_, i) => RUN_COLORS[i % RUN_COLORS.length]),
+          },
           marks: [
-            Plot.boxY(eventData, { x: "run_name", y: "time", fill: "run_name" }),
+            Plot.boxY(eventData, {
+              x: "run_name",
+              y: "time",
+              fill: "run_name",
+            }),
           ],
         })
       } else {
         chart = Plot.plot({
-          height: 160, width: 260, marginLeft: 40, marginRight: 10,
+          height: 160,
+          width: 260,
+          marginLeft: 40,
+          marginRight: 10,
           x: { axis: null, padding: 0.15 },
           y: { label: "Time (sec)", grid: true },
           marks: [
-            Plot.boxY(eventData, { x: () => "", y: "time", fill: EVENT_COLORS[EVENT_TYPE_MAP[stat.event_base as keyof typeof EVENT_TYPE_MAP]] ?? "#999" }),
+            Plot.boxY(eventData, {
+              x: () => "",
+              y: "time",
+              fill:
+                EVENT_COLORS[
+                  EVENT_TYPE_MAP[stat.event_base as keyof typeof EVENT_TYPE_MAP]
+                ] ?? "#999",
+            }),
           ],
         })
       }
@@ -123,9 +166,9 @@ export function renderEventDuration(state: AppState): void {
     }
   }
 
-  const gridState = grids.map(g => {
+  const gridState = grids.map((g) => {
     const el = clearChart(g.id)
-    const { picker } = makeGridPicker(totalEvents, sharedGridCount, n => {
+    const { picker } = makeGridPicker(totalEvents, sharedGridCount, (n) => {
       sharedGridCount = n
       renderAllDurGrids()
     })
@@ -151,5 +194,11 @@ export function renderEventDuration(state: AppState): void {
   if (state.runs.length > 1) {
     tableCols.push({ key: "mean_diff", label: "Mean Diff" })
   }
-  makeSortableTable(clearChart("dur-table-content"), tableCols, stats as unknown as Record<string, unknown>[], "max_time", false)
+  makeSortableTable(
+    clearChart("dur-table-content"),
+    tableCols,
+    stats as unknown as Record<string, unknown>[],
+    "max_time",
+    false,
+  )
 }

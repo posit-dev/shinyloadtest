@@ -2,7 +2,14 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { EVENT_COLORS, EVENT_ORDER, RUN_COLORS } from "../constants"
 import type { PairedEvent, ProcessedRun } from "../types"
-import { eventLegend, runLegend, classifiedRunData, clearChart, makeGridPicker, makeSortableTable } from "../utils"
+import {
+  eventLegend,
+  runLegend,
+  classifiedRunData,
+  clearChart,
+  makeGridPicker,
+  makeSortableTable,
+} from "../utils"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,13 +82,20 @@ describe("runLegend", () => {
   })
 
   it("returns an HTMLElement with class 'legend' for two or more runs", () => {
-    const el = runLegend([makeRun({ name: "run-a" }), makeRun({ name: "run-b" })])
+    const el = runLegend([
+      makeRun({ name: "run-a" }),
+      makeRun({ name: "run-b" }),
+    ])
     expect(el).not.toBeNull()
     expect(el!.className).toBe("legend")
   })
 
   it("creates one item per run", () => {
-    const runs = [makeRun({ name: "a" }), makeRun({ name: "b" }), makeRun({ name: "c" })]
+    const runs = [
+      makeRun({ name: "a" }),
+      makeRun({ name: "b" }),
+      makeRun({ name: "c" }),
+    ]
     const el = runLegend(runs)!
     expect(el.querySelectorAll(".legend-item").length).toBe(3)
   })
@@ -95,7 +109,9 @@ describe("runLegend", () => {
   })
 
   it("wraps around RUN_COLORS when there are more runs than colors", () => {
-    const runs = Array.from({ length: RUN_COLORS.length + 1 }, (_, i) => makeRun({ name: `run-${i}` }))
+    const runs = Array.from({ length: RUN_COLORS.length + 1 }, (_, i) =>
+      makeRun({ name: `run-${i}` }),
+    )
     const el = runLegend(runs)!
     const swatches = el.querySelectorAll<HTMLElement>(".legend-swatch")
     // Last item wraps to index 0
@@ -144,7 +160,7 @@ describe("classifiedRunData", () => {
       ],
     })
     const result = classifiedRunData(run)
-    const labels = result.map(r => r.eventLabel)
+    const labels = result.map((r) => r.eventLabel)
     expect(labels).toContain("Homepage")
     expect(labels).toContain("Calculate")
   })
@@ -293,7 +309,9 @@ describe("makeSortableTable", () => {
   ]
 
   it("does nothing when el is null", () => {
-    expect(() => makeSortableTable(null, columns, rows, "name", true)).not.toThrow()
+    expect(() =>
+      makeSortableTable(null, columns, rows, "name", true),
+    ).not.toThrow()
   })
 
   it("renders a table with class 'data-table'", () => {
@@ -306,9 +324,9 @@ describe("makeSortableTable", () => {
   it("renders the correct column headers", () => {
     makeSortableTable(container, columns, rows, "name", true)
     const headers = container.querySelectorAll("th")
-    const texts = Array.from(headers).map(th => th.textContent ?? "")
-    expect(texts.some(t => t.includes("Name"))).toBe(true)
-    expect(texts.some(t => t.includes("Value"))).toBe(true)
+    const texts = Array.from(headers).map((th) => th.textContent ?? "")
+    expect(texts.some((t) => t.includes("Name"))).toBe(true)
+    expect(texts.some((t) => t.includes("Value"))).toBe(true)
   })
 
   it("renders one tbody row per data row", () => {
@@ -320,59 +338,80 @@ describe("makeSortableTable", () => {
   it("sorts ascending by the default sort column", () => {
     makeSortableTable(container, columns, rows, "name", true)
     const cells = container.querySelectorAll("tbody tr td:first-child")
-    const names = Array.from(cells).map(td => td.textContent)
+    const names = Array.from(cells).map((td) => td.textContent)
     expect(names).toEqual(["apple", "banana", "cherry"])
   })
 
   it("sorts descending when defaultSortAsc is false", () => {
     makeSortableTable(container, columns, rows, "name", false)
     const cells = container.querySelectorAll("tbody tr td:first-child")
-    const names = Array.from(cells).map(td => td.textContent)
+    const names = Array.from(cells).map((td) => td.textContent)
     expect(names).toEqual(["cherry", "banana", "apple"])
   })
 
   it("sorts numeric columns correctly", () => {
     makeSortableTable(container, columns, rows, "value", true)
     const cells = container.querySelectorAll("tbody tr td:nth-child(2)")
-    const values = Array.from(cells).map(td => td.textContent)
+    const values = Array.from(cells).map((td) => td.textContent)
     expect(values).toEqual(["1.000", "2.000", "3.000"])
   })
 
   it("marks the active sort column header with an arrow indicator", () => {
     makeSortableTable(container, columns, rows, "name", true)
     const headers = container.querySelectorAll("th")
-    const nameHeader = Array.from(headers).find(th => th.textContent?.includes("Name"))
+    const nameHeader = Array.from(headers).find((th) =>
+      th.textContent?.includes("Name"),
+    )
     expect(nameHeader!.textContent).toMatch(/[▲▼]/)
   })
 
   it("clicking a header re-sorts by that column", () => {
     makeSortableTable(container, columns, rows, "name", true)
     const headers = container.querySelectorAll("th")
-    const valueHeader = Array.from(headers).find(th => th.textContent?.includes("Value"))!
+    const valueHeader = Array.from(headers).find((th) =>
+      th.textContent?.includes("Value"),
+    )!
     valueHeader.click()
     const cells = container.querySelectorAll("tbody tr td:nth-child(2)")
-    const values = Array.from(cells).map(td => td.textContent)
+    const values = Array.from(cells).map((td) => td.textContent)
     expect(values).toEqual(["3.000", "2.000", "1.000"])
   })
 
   it("clicking the active header toggles sort direction", () => {
     makeSortableTable(container, columns, rows, "name", true)
     const headers = container.querySelectorAll("th")
-    const nameHeader = Array.from(headers).find(th => th.textContent?.includes("Name"))!
+    const nameHeader = Array.from(headers).find((th) =>
+      th.textContent?.includes("Name"),
+    )!
     nameHeader.click()
     const cells = container.querySelectorAll("tbody tr td:first-child")
-    const names = Array.from(cells).map(td => td.textContent)
+    const names = Array.from(cells).map((td) => td.textContent)
     expect(names).toEqual(["cherry", "banana", "apple"])
   })
 
   it("formats numbers with 3 decimal places", () => {
-    makeSortableTable(container, columns, [{ name: "x", value: 1.5 }], "name", true)
+    makeSortableTable(
+      container,
+      columns,
+      [{ name: "x", value: 1.5 }],
+      "name",
+      true,
+    )
     const td = container.querySelector("tbody tr td:nth-child(2)")
     expect(td!.textContent).toBe("1.500")
   })
 
   it("renders empty string for null and undefined values", () => {
-    makeSortableTable(container, columns, [{ name: "x", value: null }, { name: "y", value: undefined }], "name", true)
+    makeSortableTable(
+      container,
+      columns,
+      [
+        { name: "x", value: null },
+        { name: "y", value: undefined },
+      ],
+      "name",
+      true,
+    )
     const tds = container.querySelectorAll("tbody tr td:nth-child(2)")
     expect(tds[0]!.textContent).toBe("")
     expect(tds[1]!.textContent).toBe("")

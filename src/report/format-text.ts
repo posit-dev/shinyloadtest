@@ -1,5 +1,10 @@
 import type { ReportData } from "./load.js"
-import { computeLatency, computeReportStats, computeSessionDurations, processRun } from "./stats.js"
+import {
+  computeLatency,
+  computeReportStats,
+  computeSessionDurations,
+  processRun,
+} from "./stats.js"
 
 function fmtTime(n: number): string {
   return n.toFixed(2) + "s"
@@ -23,8 +28,11 @@ function padRight(s: string, width: number): string {
 
 type Row = string[]
 
-function renderTable(headers: string[], alignRight: boolean[], rows: Row[]): string {
-  const cols = headers.length
+function renderTable(
+  headers: string[],
+  alignRight: boolean[],
+  rows: Row[],
+): string {
   const widths = headers.map((h, i) => {
     let w = h.length
     for (const row of rows) {
@@ -34,7 +42,9 @@ function renderTable(headers: string[], alignRight: boolean[], rows: Row[]): str
   })
 
   const headerRow = headers
-    .map((h, i) => (alignRight[i] ? padLeft(h, widths[i]!) : padRight(h, widths[i]!)))
+    .map((h, i) =>
+      alignRight[i] ? padLeft(h, widths[i]!) : padRight(h, widths[i]!),
+    )
     .join(" | ")
 
   const sepRow = widths
@@ -43,13 +53,17 @@ function renderTable(headers: string[], alignRight: boolean[], rows: Row[]): str
 
   const dataRows = rows.map((row) =>
     row
-      .map((cell, i) => (alignRight[i] ? padLeft(cell, widths[i]!) : padRight(cell, widths[i]!)))
+      .map((cell, i) =>
+        alignRight[i] ? padLeft(cell, widths[i]!) : padRight(cell, widths[i]!),
+      )
       .join(" | "),
   )
 
-  return ["| " + headerRow + " |", "|-" + sepRow + "-|", ...dataRows.map((r) => "| " + r + " |")].join(
-    "\n",
-  )
+  return [
+    "| " + headerRow + " |",
+    "|-" + sepRow + "-|",
+    ...dataRows.map((r) => "| " + r + " |"),
+  ].join("\n")
 }
 
 export function generateReportText(data: ReportData): string {
@@ -67,7 +81,6 @@ export function generateReportText(data: ReportData): string {
   const recordingDuration = fmtTime(data.recording.duration / 1000)
 
   let totalSessions = 0
-  let maintenanceSessions = 0
   let totalDataPoints = 0
 
   const workerIds = new Set<string>()
@@ -78,7 +91,6 @@ export function generateReportText(data: ReportData): string {
     for (const e of pr.paired) {
       workerIds.add(pr.name + ":" + e.worker_id)
       sessIds.add(e.session_id)
-      if (e.maintenance) maintenanceSessions++
     }
     totalSessions += sessIds.size
     totalDataPoints += run.rows.length
@@ -119,16 +131,22 @@ export function generateReportText(data: ReportData): string {
   const perRunDurations = processedRuns.map((r) =>
     computeSessionDurations(r.paired, data.recording.duration),
   )
-  const allDurations = perRunDurations.flatMap((sd) => sd.sessions.map((s) => s.duration))
+  const allDurations = perRunDurations.flatMap((sd) =>
+    sd.sessions.map((s) => s.duration),
+  )
   if (allDurations.length > 0) {
     const recordingDuration = data.recording.duration / 1000
     const sorted = [...allDurations].sort((a, b) => a - b)
     const mid = Math.floor(sorted.length / 2)
-    const medianDur = sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+    const medianDur =
+      sorted.length % 2 === 1
+        ? sorted[mid]!
+        : (sorted[mid - 1]! + sorted[mid]!) / 2
     const maxDur = sorted[sorted.length - 1]!
     const sd = { median: medianDur, max: maxDur, recordingDuration }
     const maxVsBaseline = sd.max - sd.recordingDuration
-    const pct = sd.recordingDuration > 0 ? ((sd.max / sd.recordingDuration) - 1) * 100 : 0
+    const pct =
+      sd.recordingDuration > 0 ? (sd.max / sd.recordingDuration - 1) * 100 : 0
     const sign = maxVsBaseline >= 0 ? "+" : ""
     const maxVsBaselineStr = `${sign}${fmtTime(maxVsBaseline)} (${sign}${fmtNum(pct, 1)}%)`
 
@@ -206,11 +224,20 @@ export function generateReportText(data: ReportData): string {
   // Latency
   // -------------------------------------------------------------------------
 
-  const latency = processedRuns.length > 0 ? computeLatency(processedRuns) : null
+  const latency =
+    processedRuns.length > 0 ? computeLatency(processedRuns) : null
   if (latency) {
     const latRows: Row[] = [
-      ["HTTP (Homepage + JS/CSS)", fmtTime(latency.httpMedian), fmtTime(latency.httpP95)],
-      ["WebSocket (Calculate)", fmtTime(latency.wsMedian), fmtTime(latency.wsP95)],
+      [
+        "HTTP (Homepage + JS/CSS)",
+        fmtTime(latency.httpMedian),
+        fmtTime(latency.httpP95),
+      ],
+      [
+        "WebSocket (Calculate)",
+        fmtTime(latency.wsMedian),
+        fmtTime(latency.wsP95),
+      ],
     ]
 
     sections.push(

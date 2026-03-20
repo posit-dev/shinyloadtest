@@ -7,7 +7,7 @@ export function processRun(run: RawRun): ProcessedRun {
   const minTs = rows[0].timestamp
 
   let cumConc = 0
-  const normalized = rows.map(row => {
+  const normalized = rows.map((row) => {
     if (row.event === "WS_OPEN_START") cumConc++
     else if (row.event === "WS_CLOSE_END") cumConc--
     return {
@@ -18,24 +18,31 @@ export function processRun(run: RawRun): ProcessedRun {
   })
 
   const relevant = normalized.filter(
-    d =>
+    (d) =>
       !d.event.startsWith("PLAYBACK") &&
       d.event !== "PLAYER_SESSION_CREATE" &&
       d.event !== "PLAYBACK_DONE" &&
-      d.input_line_number > 0
+      d.input_line_number > 0,
   )
 
   const groups = new Map<string, typeof relevant>()
   for (const row of relevant) {
-    const key = row.session_id + "," + row.worker_id + "," + row.iteration + "," + row.input_line_number
+    const key =
+      row.session_id +
+      "," +
+      row.worker_id +
+      "," +
+      row.iteration +
+      "," +
+      row.input_line_number
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(row)
   }
 
   const paired: Omit<PairedEvent, "maintenance">[] = []
   for (const [, groupRows] of groups) {
-    const start = Math.min(...groupRows.map(r => r.ts))
-    const end = Math.max(...groupRows.map(r => r.ts))
+    const start = Math.min(...groupRows.map((r) => r.ts))
+    const end = Math.max(...groupRows.map((r) => r.ts))
     const concSum = groupRows.reduce((s, r) => s + r.concurrency, 0)
     const baseEvent = groupRows[0].event.replace(/_(START|END)$/, "")
 
@@ -56,14 +63,21 @@ export function processRun(run: RawRun): ProcessedRun {
 
   return {
     name: run.name,
-    paired: paired.map(r => ({
+    paired: paired.map((r) => ({
       ...r,
       maintenance: maintenance.has(r.session_id),
     })),
   }
 }
 
-export function identifyMaintenance(events: Array<{ session_id: number; worker_id: number; start: number; end: number }>): Set<number> {
+export function identifyMaintenance(
+  events: Array<{
+    session_id: number
+    worker_id: number
+    start: number
+    end: number
+  }>,
+): Set<number> {
   const byWorker = new Map<number, typeof events>()
   for (const e of events) {
     if (!byWorker.has(e.worker_id)) byWorker.set(e.worker_id, [])
@@ -71,21 +85,22 @@ export function identifyMaintenance(events: Array<{ session_id: number; worker_i
   }
 
   if (byWorker.size <= 1) {
-    return new Set(events.map(e => e.session_id))
+    return new Set(events.map((e) => e.session_id))
   }
 
   let latestStart = -Infinity
   let earliestEnd = Infinity
   for (const [, workerEvents] of byWorker) {
-    const starts = workerEvents.map(e => e.start)
-    const ends = workerEvents.map(e => e.end)
+    const starts = workerEvents.map((e) => e.start)
+    const ends = workerEvents.map((e) => e.end)
     latestStart = Math.max(latestStart, Math.min(...starts))
     earliestEnd = Math.min(earliestEnd, Math.max(...ends))
   }
 
   const bySess = new Map<number, { min: number; max: number }>()
   for (const e of events) {
-    if (!bySess.has(e.session_id)) bySess.set(e.session_id, { min: Infinity, max: -Infinity })
+    if (!bySess.has(e.session_id))
+      bySess.set(e.session_id, { min: Infinity, max: -Infinity })
     const s = bySess.get(e.session_id)!
     s.min = Math.min(s.min, e.start)
     s.max = Math.max(s.max, e.end)
@@ -99,7 +114,7 @@ export function identifyMaintenance(events: Array<{ session_id: number; worker_i
   }
 
   if (maintenanceSessions.size === 0) {
-    return new Set(events.map(e => e.session_id))
+    return new Set(events.map((e) => e.session_id))
   }
 
   return maintenanceSessions

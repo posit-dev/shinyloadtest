@@ -1,4 +1,9 @@
-import { EVENT_COLORS, EVENT_ORDER, EVENT_TYPE_MAP, RUN_COLORS } from "./constants"
+import {
+  EVENT_COLORS,
+  EVENT_ORDER,
+  EVENT_TYPE_MAP,
+  RUN_COLORS,
+} from "./constants"
 import type { PairedEvent, ProcessedRun } from "./types"
 
 export function eventLegend(): HTMLElement {
@@ -7,7 +12,11 @@ export function eventLegend(): HTMLElement {
   for (const label of EVENT_ORDER) {
     const item = document.createElement("span")
     item.className = "legend-item"
-    item.innerHTML = '<span class="legend-swatch" style="background:' + EVENT_COLORS[label] + '"></span>' + label
+    item.innerHTML =
+      '<span class="legend-swatch" style="background:' +
+      EVENT_COLORS[label] +
+      '"></span>' +
+      label
     div.appendChild(item)
   }
   return div
@@ -30,10 +39,19 @@ export function runLegend(runs: ProcessedRun[]): HTMLElement | null {
   return div
 }
 
-export function classifiedRunData(run: ProcessedRun): Array<PairedEvent & { eventLabel: string }> {
+export function classifiedRunData(
+  run: ProcessedRun,
+): Array<PairedEvent & { eventLabel: string }> {
   return run.paired
-    .filter(d => d.maintenance && EVENT_TYPE_MAP[d.event_base as keyof typeof EVENT_TYPE_MAP])
-    .map(d => ({ ...d, eventLabel: EVENT_TYPE_MAP[d.event_base as keyof typeof EVENT_TYPE_MAP] }))
+    .filter(
+      (d) =>
+        d.maintenance &&
+        EVENT_TYPE_MAP[d.event_base as keyof typeof EVENT_TYPE_MAP],
+    )
+    .map((d) => ({
+      ...d,
+      eventLabel: EVENT_TYPE_MAP[d.event_base as keyof typeof EVENT_TYPE_MAP],
+    }))
 }
 
 export function clearChart(id: string): HTMLElement {
@@ -58,22 +76,41 @@ export function enableTooltips(chartEl: HTMLElement): void {
     titleEl.remove()
     parent.setAttribute("role", "img")
     parent.setAttribute("aria-label", text)
-    parent.addEventListener("mouseenter", e => {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+    parent.addEventListener("mouseenter", (e) => {
+      if (hideTimer) {
+        clearTimeout(hideTimer)
+        hideTimer = null
+      }
       tooltip.textContent = text
       tooltip.style.opacity = "1"
       const rect = parent.getBoundingClientRect()
-      tooltip.style.left = Math.max(8, Math.min((e as MouseEvent).clientX + 12, window.innerWidth - tooltip.offsetWidth - 8)) + "px"
-      tooltip.style.top = (rect.top - tooltip.offsetHeight - 6) + "px"
+      tooltip.style.left =
+        Math.max(
+          8,
+          Math.min(
+            (e as MouseEvent).clientX + 12,
+            window.innerWidth - tooltip.offsetWidth - 8,
+          ),
+        ) + "px"
+      tooltip.style.top = rect.top - tooltip.offsetHeight - 6 + "px"
       if (parseFloat(tooltip.style.top) < 0) {
-        tooltip.style.top = (rect.bottom + 6) + "px"
+        tooltip.style.top = rect.bottom + 6 + "px"
       }
     })
-    parent.addEventListener("mousemove", e => {
-      tooltip.style.left = Math.max(8, Math.min((e as MouseEvent).clientX + 12, window.innerWidth - tooltip.offsetWidth - 8)) + "px"
+    parent.addEventListener("mousemove", (e) => {
+      tooltip.style.left =
+        Math.max(
+          8,
+          Math.min(
+            (e as MouseEvent).clientX + 12,
+            window.innerWidth - tooltip.offsetWidth - 8,
+          ),
+        ) + "px"
     })
     parent.addEventListener("mouseleave", () => {
-      hideTimer = setTimeout(() => { tooltip.style.opacity = "0" }, 500)
+      hideTimer = setTimeout(() => {
+        tooltip.style.opacity = "0"
+      }, 500)
     })
   }
 }
@@ -81,12 +118,19 @@ export function enableTooltips(chartEl: HTMLElement): void {
 export function makeGridPicker(
   totalEvents: number,
   defaultCount: number,
-  onChangeCallback: (n: number) => void
+  onChangeCallback: (n: number) => void,
 ): { picker: HTMLElement; getCount: () => number } {
   const count = Math.min(defaultCount, totalEvents)
   const picker = document.createElement("div")
   picker.className = "grid-picker"
-  picker.innerHTML = "Show <input type='number' value='" + count + "' min='1' max='" + totalEvents + "'> of " + totalEvents + " events"
+  picker.innerHTML =
+    "Show <input type='number' value='" +
+    count +
+    "' min='1' max='" +
+    totalEvents +
+    "'> of " +
+    totalEvents +
+    " events"
   const input = picker.querySelector("input")!
   const clamp = () => {
     const n = Number(input.value)
@@ -101,31 +145,47 @@ export function makeSortableTable(
   columns: Array<{ key: string; label: string }>,
   rows: Record<string, unknown>[],
   defaultSortCol: string,
-  defaultSortAsc: boolean
+  defaultSortAsc: boolean,
 ): void {
   if (!el) return
+  const container = el
   let sortCol = defaultSortCol
   let sortAsc = defaultSortAsc
   const fmt = (v: unknown) =>
-    v !== undefined && v !== null ? (typeof v === "number" ? v.toFixed(3) : String(v)) : ""
+    v !== undefined && v !== null
+      ? typeof v === "number"
+        ? v.toFixed(3)
+        : String(v)
+      : ""
 
   function render() {
     const sorted = [...rows].sort((a, b) => {
-      const av = a[sortCol], bv = b[sortCol]
-      if (typeof av === "number" && typeof bv === "number") return sortAsc ? av - bv : bv - av
-      return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av))
+      const av = a[sortCol],
+        bv = b[sortCol]
+      if (typeof av === "number" && typeof bv === "number")
+        return sortAsc ? av - bv : bv - av
+      return sortAsc
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av))
     })
 
     const table = document.createElement("table")
     table.className = "data-table"
     const thead = document.createElement("thead")
     const headRow = document.createElement("tr")
-    columns.forEach(col => {
+    columns.forEach((col) => {
       const th = document.createElement("th")
-      th.textContent = col.label + (sortCol === col.key ? (sortAsc ? " \u25B2" : " \u25BC") : "")
+      th.textContent =
+        col.label +
+        (sortCol === col.key ? (sortAsc ? " \u25B2" : " \u25BC") : "")
       th.style.cursor = "pointer"
       th.addEventListener("click", () => {
-        if (sortCol === col.key) { sortAsc = !sortAsc } else { sortCol = col.key; sortAsc = false }
+        if (sortCol === col.key) {
+          sortAsc = !sortAsc
+        } else {
+          sortCol = col.key
+          sortAsc = false
+        }
         render()
       })
       headRow.appendChild(th)
@@ -136,7 +196,7 @@ export function makeSortableTable(
     const tbody = document.createElement("tbody")
     for (const row of sorted) {
       const tr = document.createElement("tr")
-      columns.forEach(col => {
+      columns.forEach((col) => {
         const td = document.createElement("td")
         td.textContent = fmt(row[col.key])
         tr.appendChild(td)
@@ -145,8 +205,8 @@ export function makeSortableTable(
     }
     table.appendChild(tbody)
 
-    el.innerHTML = ""
-    el.appendChild(table)
+    container.innerHTML = ""
+    container.appendChild(table)
   }
 
   render()

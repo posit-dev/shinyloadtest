@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import type { SessionRow, RecordingEventInfo, ReportData } from "../report/load.js"
+import type {
+  SessionRow,
+  RecordingEventInfo,
+  ReportData,
+} from "../report/load.js"
 import {
   processRun,
   classifyEvent,
@@ -23,11 +27,31 @@ function makeRow(overrides: Partial<SessionRow>): SessionRow {
   }
 }
 
-function makeRecording(events?: Partial<RecordingEventInfo>[]): ReportData["recording"] {
+function makeRecording(
+  events?: Partial<RecordingEventInfo>[],
+): ReportData["recording"] {
   const defaultEvents: RecordingEventInfo[] = [
-    { lineNumber: 1, type: "REQ_HOME", begin: 0, end: 100, label: "Event 1) Get: Homepage" },
-    { lineNumber: 2, type: "REQ_GET", begin: 100, end: 200, label: "Event 2) Get: app.js" },
-    { lineNumber: 3, type: "WS_RECV", begin: 200, end: 500, label: "Event 3) Updated: x" },
+    {
+      lineNumber: 1,
+      type: "REQ_HOME",
+      begin: 0,
+      end: 100,
+      label: "Event 1) Get: Homepage",
+    },
+    {
+      lineNumber: 2,
+      type: "REQ_GET",
+      begin: 100,
+      end: 200,
+      label: "Event 2) Get: app.js",
+    },
+    {
+      lineNumber: 3,
+      type: "WS_RECV",
+      begin: 200,
+      end: 500,
+      label: "Event 3) Updated: x",
+    },
   ]
   return {
     events: (events as RecordingEventInfo[]) ?? defaultEvents,
@@ -83,8 +107,16 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -97,8 +129,16 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "REQ_HOME_START", timestamp: 10000, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 11000, input_line_number: 1 }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 10000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 11000,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -110,8 +150,16 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -123,10 +171,26 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
-        makeRow({ event: "PLAYBACK_START", timestamp: 2000, input_line_number: 0 }),
-        makeRow({ event: "PLAYBACK_DONE", timestamp: 2100, input_line_number: 0 }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "PLAYBACK_START",
+          timestamp: 2000,
+          input_line_number: 0,
+        }),
+        makeRow({
+          event: "PLAYBACK_DONE",
+          timestamp: 2100,
+          input_line_number: 0,
+        }),
       ],
     }
     const result = processRun(run)
@@ -138,9 +202,21 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "PLAYER_SESSION_CREATE", timestamp: 900, input_line_number: 0 }),
-        makeRow({ event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
+        makeRow({
+          event: "PLAYER_SESSION_CREATE",
+          timestamp: 900,
+          input_line_number: 0,
+        }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -151,10 +227,22 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "WS_OPEN_START", timestamp: 900, input_line_number: 0 }),
+        makeRow({
+          event: "WS_OPEN_START",
+          timestamp: 900,
+          input_line_number: 0,
+        }),
         makeRow({ event: "WS_OPEN_END", timestamp: 950, input_line_number: 0 }),
-        makeRow({ event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -165,11 +253,31 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ event: "WS_OPEN_START", timestamp: 1000, input_line_number: 0 }),
-        makeRow({ event: "WS_OPEN_START", timestamp: 1100, input_line_number: 0 }),
-        makeRow({ event: "REQ_HOME_START", timestamp: 1200, input_line_number: 1 }),
-        makeRow({ event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
-        makeRow({ event: "WS_CLOSE_END", timestamp: 1600, input_line_number: 0 }),
+        makeRow({
+          event: "WS_OPEN_START",
+          timestamp: 1000,
+          input_line_number: 0,
+        }),
+        makeRow({
+          event: "WS_OPEN_START",
+          timestamp: 1100,
+          input_line_number: 0,
+        }),
+        makeRow({
+          event: "REQ_HOME_START",
+          timestamp: 1200,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
+        makeRow({
+          event: "WS_CLOSE_END",
+          timestamp: 1600,
+          input_line_number: 0,
+        }),
       ],
     }
     const result = processRun(run)
@@ -180,10 +288,34 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 0, event: "REQ_HOME_START", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 0, event: "REQ_HOME_END", timestamp: 2500, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 2500,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -195,18 +327,56 @@ describe("processRun", () => {
       name: "test-run",
       rows: [
         // Worker 0: sessions overlap with worker 1 at s=2..4
-        makeRow({ session_id: 10, worker_id: 0, event: "REQ_HOME_START", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 10, worker_id: 0, event: "REQ_HOME_END", timestamp: 4000, input_line_number: 1 }),
+        makeRow({
+          session_id: 10,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 10,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 4000,
+          input_line_number: 1,
+        }),
         // Worker 1: sessions overlap with worker 0 at s=2..4
-        makeRow({ session_id: 20, worker_id: 1, event: "REQ_HOME_START", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 20, worker_id: 1, event: "REQ_HOME_END", timestamp: 4000, input_line_number: 1 }),
+        makeRow({
+          session_id: 20,
+          worker_id: 1,
+          event: "REQ_HOME_START",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 20,
+          worker_id: 1,
+          event: "REQ_HOME_END",
+          timestamp: 4000,
+          input_line_number: 1,
+        }),
         // Early session on worker 0 (outside overlap)
-        makeRow({ session_id: 30, worker_id: 0, event: "REQ_HOME_START", timestamp: 100, input_line_number: 1 }),
-        makeRow({ session_id: 30, worker_id: 0, event: "REQ_HOME_END", timestamp: 200, input_line_number: 1 }),
+        makeRow({
+          session_id: 30,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 100,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 30,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 200,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
-    const maintenanceIds = result.paired.filter((p) => p.maintenance).map((p) => p.session_id)
+    const maintenanceIds = result.paired
+      .filter((p) => p.maintenance)
+      .map((p) => p.session_id)
     expect(maintenanceIds).toContain(10)
     expect(maintenanceIds).toContain(20)
     expect(maintenanceIds).not.toContain(30)
@@ -216,10 +386,34 @@ describe("processRun", () => {
     const run = {
       name: "test-run",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1100, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 1, event: "REQ_HOME_START", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 1, event: "REQ_HOME_END", timestamp: 2100, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1100,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 1,
+          event: "REQ_HOME_START",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 1,
+          event: "REQ_HOME_END",
+          timestamp: 2100,
+          input_line_number: 1,
+        }),
       ],
     }
     const result = processRun(run)
@@ -232,10 +426,30 @@ describe("computeSessionDurations", () => {
     const run = processRun({
       name: "test",
       rows: [
-        makeRow({ session_id: 1, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, event: "REQ_HOME_END", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 1, event: "REQ_GET_START", timestamp: 2000, input_line_number: 2 }),
-        makeRow({ session_id: 1, event: "REQ_GET_END", timestamp: 3000, input_line_number: 2 }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_HOME_END",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_GET_START",
+          timestamp: 2000,
+          input_line_number: 2,
+        }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_GET_END",
+          timestamp: 3000,
+          input_line_number: 2,
+        }),
       ],
     })
     const stats = computeSessionDurations(run.paired, 5000)
@@ -247,10 +461,30 @@ describe("computeSessionDurations", () => {
     const run = processRun({
       name: "test",
       rows: [
-        makeRow({ session_id: 1, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, event: "REQ_HOME_END", timestamp: 2000, input_line_number: 1 }),
-        makeRow({ session_id: 2, event: "REQ_HOME_START", timestamp: 3000, input_line_number: 1 }),
-        makeRow({ session_id: 2, event: "REQ_HOME_END", timestamp: 6000, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          event: "REQ_HOME_END",
+          timestamp: 2000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          event: "REQ_HOME_START",
+          timestamp: 3000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          event: "REQ_HOME_END",
+          timestamp: 6000,
+          input_line_number: 1,
+        }),
       ],
     })
     const stats = computeSessionDurations(run.paired, 5000)
@@ -273,13 +507,32 @@ describe("computeSessionDurations", () => {
 })
 
 describe("computeEventDurations", () => {
-  function makeMaintenanceRun(name: string, times: { lineNum: number; ms: number }[]): ReturnType<typeof processRun> {
+  function makeMaintenanceRun(
+    name: string,
+    times: { lineNum: number; ms: number }[],
+  ): ReturnType<typeof processRun> {
     const rows: SessionRow[] = []
     let ts = 1000
     let sessId = 1
     for (const { lineNum, ms } of times) {
-      rows.push(makeRow({ session_id: sessId, worker_id: 0, event: "REQ_HOME_START", timestamp: ts, input_line_number: lineNum }))
-      rows.push(makeRow({ session_id: sessId, worker_id: 0, event: "REQ_HOME_END", timestamp: ts + ms, input_line_number: lineNum }))
+      rows.push(
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: ts,
+          input_line_number: lineNum,
+        }),
+      )
+      rows.push(
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: ts + ms,
+          input_line_number: lineNum,
+        }),
+      )
       ts += ms + 100
       sessId++
     }
@@ -343,9 +596,33 @@ describe("computeEventConcurrency", () => {
     const rows: SessionRow[] = []
     for (let i = 0; i < 5; i++) {
       const ts = 1000 + i * 1000
-      rows.push(makeRow({ session_id: i + 1, worker_id: 0, event: "WS_OPEN_START", timestamp: ts, input_line_number: 0 }))
-      rows.push(makeRow({ session_id: i + 1, worker_id: 0, event: "REQ_HOME_START", timestamp: ts + 10, input_line_number: 1 }))
-      rows.push(makeRow({ session_id: i + 1, worker_id: 0, event: "REQ_HOME_END", timestamp: ts + 100, input_line_number: 1 }))
+      rows.push(
+        makeRow({
+          session_id: i + 1,
+          worker_id: 0,
+          event: "WS_OPEN_START",
+          timestamp: ts,
+          input_line_number: 0,
+        }),
+      )
+      rows.push(
+        makeRow({
+          session_id: i + 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: ts + 10,
+          input_line_number: 1,
+        }),
+      )
+      rows.push(
+        makeRow({
+          session_id: i + 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: ts + 100,
+          input_line_number: 1,
+        }),
+      )
     }
     return processRun({ name: "concurrency-run", rows })
   }
@@ -354,8 +631,20 @@ describe("computeEventConcurrency", () => {
     const run = processRun({
       name: "single",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
       ],
     })
     const stats = computeEventConcurrency([run], makeRecording())
@@ -375,22 +664,64 @@ describe("computeEventConcurrency", () => {
     const run1 = makeRunWithConcurrency()
     const recording = makeRecording([
       { lineNumber: 1, type: "REQ_HOME", begin: 0, end: 100, label: "Event 1" },
-      { lineNumber: 2, type: "REQ_GET", begin: 100, end: 200, label: "Event 2" },
+      {
+        lineNumber: 2,
+        type: "REQ_GET",
+        begin: 100,
+        end: 200,
+        label: "Event 2",
+      },
     ])
     const extraRows: SessionRow[] = []
     for (let i = 0; i < 5; i++) {
       const ts = 1000 + i * 1000
-      extraRows.push(makeRow({ session_id: i + 1, worker_id: 0, event: "REQ_GET_START", timestamp: ts + 200, input_line_number: 2 }))
-      extraRows.push(makeRow({ session_id: i + 1, worker_id: 0, event: "REQ_GET_END", timestamp: ts + 210, input_line_number: 2 }))
+      extraRows.push(
+        makeRow({
+          session_id: i + 1,
+          worker_id: 0,
+          event: "REQ_GET_START",
+          timestamp: ts + 200,
+          input_line_number: 2,
+        }),
+      )
+      extraRows.push(
+        makeRow({
+          session_id: i + 1,
+          worker_id: 0,
+          event: "REQ_GET_END",
+          timestamp: ts + 210,
+          input_line_number: 2,
+        }),
+      )
     }
-    const run2 = processRun({ name: "r2", rows: [...run1.paired.flatMap((p) => [
-      makeRow({ session_id: p.session_id, worker_id: p.worker_id, event: p.event_base + "_START", timestamp: Math.round(p.start * 1000 + 1000), input_line_number: p.input_line_number }),
-      makeRow({ session_id: p.session_id, worker_id: p.worker_id, event: p.event_base + "_END", timestamp: Math.round(p.end * 1000 + 1000), input_line_number: p.input_line_number }),
-    ]), ...extraRows] })
+    const run2 = processRun({
+      name: "r2",
+      rows: [
+        ...run1.paired.flatMap((p) => [
+          makeRow({
+            session_id: p.session_id,
+            worker_id: p.worker_id,
+            event: p.event_base + "_START",
+            timestamp: Math.round(p.start * 1000 + 1000),
+            input_line_number: p.input_line_number,
+          }),
+          makeRow({
+            session_id: p.session_id,
+            worker_id: p.worker_id,
+            event: p.event_base + "_END",
+            timestamp: Math.round(p.end * 1000 + 1000),
+            input_line_number: p.input_line_number,
+          }),
+        ]),
+        ...extraRows,
+      ],
+    })
     const stats = computeEventConcurrency([run1, run2], recording)
     expect(stats.length).toBeGreaterThanOrEqual(2)
     for (let i = 0; i < stats.length - 1; i++) {
-      expect(Math.abs(stats[i]!.slope)).toBeGreaterThanOrEqual(Math.abs(stats[i + 1]!.slope))
+      expect(Math.abs(stats[i]!.slope)).toBeGreaterThanOrEqual(
+        Math.abs(stats[i + 1]!.slope),
+      )
     }
   })
 
@@ -401,14 +732,43 @@ describe("computeEventConcurrency", () => {
 })
 
 describe("computeLatency", () => {
-  function makeLatencyRun(name: string, sessId: number, httpMs: number, wsMs: number): ReturnType<typeof processRun> {
+  function makeLatencyRun(
+    name: string,
+    sessId: number,
+    httpMs: number,
+    wsMs: number,
+  ): ReturnType<typeof processRun> {
     return processRun({
       name,
       rows: [
-        makeRow({ session_id: sessId, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: sessId, worker_id: 0, event: "REQ_HOME_END", timestamp: 1000 + httpMs, input_line_number: 1 }),
-        makeRow({ session_id: sessId, worker_id: 0, event: "WS_RECV_START", timestamp: 2000, input_line_number: 3 }),
-        makeRow({ session_id: sessId, worker_id: 0, event: "WS_RECV_END", timestamp: 2000 + wsMs, input_line_number: 3 }),
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1000 + httpMs,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "WS_RECV_START",
+          timestamp: 2000,
+          input_line_number: 3,
+        }),
+        makeRow({
+          session_id: sessId,
+          worker_id: 0,
+          event: "WS_RECV_END",
+          timestamp: 2000 + wsMs,
+          input_line_number: 3,
+        }),
       ],
     })
   }
@@ -417,10 +777,34 @@ describe("computeLatency", () => {
     const run = processRun({
       name: "run1",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1200, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_GET_START", timestamp: 1200, input_line_number: 2 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_GET_END", timestamp: 1500, input_line_number: 2 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1200,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_GET_START",
+          timestamp: 1200,
+          input_line_number: 2,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_GET_END",
+          timestamp: 1500,
+          input_line_number: 2,
+        }),
       ],
     })
     const stats = computeLatency([run])
@@ -434,10 +818,34 @@ describe("computeLatency", () => {
     const run = processRun({
       name: "run1",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "WS_RECV_START", timestamp: 1000, input_line_number: 3 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "WS_RECV_END", timestamp: 1300, input_line_number: 3 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "WS_RECV_START", timestamp: 1300, input_line_number: 4 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "WS_RECV_END", timestamp: 1700, input_line_number: 4 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "WS_RECV_START",
+          timestamp: 1000,
+          input_line_number: 3,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "WS_RECV_END",
+          timestamp: 1300,
+          input_line_number: 3,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "WS_RECV_START",
+          timestamp: 1300,
+          input_line_number: 4,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "WS_RECV_END",
+          timestamp: 1700,
+          input_line_number: 4,
+        }),
       ],
     })
     const stats = computeLatency([run])
@@ -449,10 +857,34 @@ describe("computeLatency", () => {
     const run = processRun({
       name: "run1",
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 1, event: "REQ_HOME_START", timestamp: 5000, input_line_number: 1 }),
-        makeRow({ session_id: 2, worker_id: 1, event: "REQ_HOME_END", timestamp: 5500, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1500,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 1,
+          event: "REQ_HOME_START",
+          timestamp: 5000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 2,
+          worker_id: 1,
+          event: "REQ_HOME_END",
+          timestamp: 5500,
+          input_line_number: 1,
+        }),
       ],
     })
     const stats = computeLatency([run])
@@ -493,8 +925,20 @@ describe("computeReportStats", () => {
         {
           name: "run1",
           rows: [
-            makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-            makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1500, input_line_number: 1 }),
+            makeRow({
+              session_id: 1,
+              worker_id: 0,
+              event: "REQ_HOME_START",
+              timestamp: 1000,
+              input_line_number: 1,
+            }),
+            makeRow({
+              session_id: 1,
+              worker_id: 0,
+              event: "REQ_HOME_END",
+              timestamp: 1500,
+              input_line_number: 1,
+            }),
           ],
         },
       ],
@@ -515,8 +959,20 @@ describe("computeReportStats", () => {
     const makeRun = (name: string, ms: number) => ({
       name,
       rows: [
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_START", timestamp: 1000, input_line_number: 1 }),
-        makeRow({ session_id: 1, worker_id: 0, event: "REQ_HOME_END", timestamp: 1000 + ms, input_line_number: 1 }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_START",
+          timestamp: 1000,
+          input_line_number: 1,
+        }),
+        makeRow({
+          session_id: 1,
+          worker_id: 0,
+          event: "REQ_HOME_END",
+          timestamp: 1000 + ms,
+          input_line_number: 1,
+        }),
       ],
     })
     const data: ReportData = {

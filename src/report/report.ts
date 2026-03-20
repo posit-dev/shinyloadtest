@@ -42,7 +42,9 @@ export async function report(options: ReportOptions): Promise<void> {
 
   if (options.format === "text" || options.format === "json") {
     const output =
-      options.format === "json" ? generateReportJSON(data) : generateReportText(data)
+      options.format === "json"
+        ? generateReportJSON(data)
+        : generateReportText(data)
 
     if (options.output) {
       const outputPath = path.resolve(options.output)
@@ -71,8 +73,12 @@ export async function report(options: ReportOptions): Promise<void> {
   const totalRows = data.runs.reduce((s, r) => s + r.rows.length, 0)
   const durationSec = Math.round(data.recording.duration / 1000)
 
-  w(`  ${dim("Recording:")}  ${bold(String(nEvents))} events${dim(",")} ${bold(`${durationSec}s`)} duration\n`)
-  w(`  ${dim("Sessions:")}   ${bold(totalRows.toLocaleString("en-US"))} data points\n`)
+  w(
+    `  ${dim("Recording:")}  ${bold(String(nEvents))} events${dim(",")} ${bold(`${durationSec}s`)} duration\n`,
+  )
+  w(
+    `  ${dim("Sessions:")}   ${bold(totalRows.toLocaleString("en-US"))} data points\n`,
+  )
   w("\n")
 
   const html = generateReportHTML(data)

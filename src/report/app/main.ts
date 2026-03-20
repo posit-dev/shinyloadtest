@@ -1,7 +1,13 @@
 import "./style.css"
 import type { RawData, AppState } from "./types"
 import { processRun } from "./data-processing"
-import { setupNavigation, setupRunSelector, getUrlState, navigateToSection, navigateToSubTab } from "./navigation"
+import {
+  setupNavigation,
+  setupRunSelector,
+  getUrlState,
+  navigateToSection,
+  navigateToSubTab,
+} from "./navigation"
 import { renderSessions } from "./charts/sessions"
 import { renderSessionDuration } from "./charts/session-duration"
 import { renderWaterfall } from "./charts/waterfall"
@@ -25,7 +31,7 @@ if (import.meta.env.DEV) {
   }
 } else {
   rawData = JSON.parse(
-    document.getElementById("report-data")!.textContent!
+    document.getElementById("report-data")!.textContent!,
   ) as RawData
 }
 
@@ -33,12 +39,12 @@ const runs = rawData.runs.map(processRun)
 const recordingDuration = rawData.recording.duration / 1000
 
 const recordingLabelMap = new Map(
-  rawData.recording.events.map(e => [e.lineNumber, e.label])
+  rawData.recording.events.map((e) => [e.lineNumber, e.label]),
 )
 
 const globalSessionsXDomain: [number, number] = [
-  d3.min(runs, run => d3.min(run.paired, d => d.start)) ?? 0,
-  d3.max(runs, run => d3.max(run.paired, d => d.end)) ?? 1,
+  d3.min(runs, (run) => d3.min(run.paired, (d) => d.start)) ?? 0,
+  d3.max(runs, (run) => d3.max(run.paired, (d) => d.end)) ?? 1,
 ]
 
 const state: AppState = {
@@ -85,7 +91,7 @@ function renderAll() {
 }
 
 setupNavigation()
-setupRunSelector(runs, idx => {
+setupRunSelector(runs, (idx) => {
   state.currentRunIdx = idx
   renderPerRun()
 })
@@ -101,7 +107,9 @@ const urlState = getUrlState()
 const runIdx = Number(urlState.run)
 if (Number.isInteger(runIdx) && runIdx >= 0 && runIdx < runs.length) {
   state.currentRunIdx = runIdx
-  const runSelect = document.getElementById("run-select") as HTMLSelectElement | null
+  const runSelect = document.getElementById(
+    "run-select",
+  ) as HTMLSelectElement | null
   if (runSelect) runSelect.value = String(state.currentRunIdx)
   renderPerRun()
 }
@@ -110,5 +118,6 @@ if (urlState.section && urlState.section !== "sessions") {
 }
 if (urlState.tab) {
   const activeSection = document.querySelector(".section.active")
-  if (activeSection) navigateToSubTab(activeSection as HTMLElement, urlState.tab, false)
+  if (activeSection)
+    navigateToSubTab(activeSection as HTMLElement, urlState.tab, false)
 }

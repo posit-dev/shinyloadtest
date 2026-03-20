@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "lint": "eslint src/",
     "format": "prettier --list-different --write src/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/report/app/tsconfig.json",
     "prepack": "npm run build",
     "pre-push": "npx prettier --check src/ && npm run lint && npm run typecheck"
   },

@@ -339,13 +339,20 @@ export function parseArgs(argv?: string[]): CliResult {
         `  ${cyan("$")} shinyloadtest report --format json | jq .`,
     )
     .argument("[dirs...]", "Test output directories (auto-detected if omitted)")
-    .option("--format <format>", "Output format: html, text, or json", (value: string) => {
-      const validFormats = ["html", "text", "json"]
-      if (!validFormats.includes(value)) {
-        throw new InvalidArgumentError(`Must be one of: ${validFormats.join(", ")}`)
-      }
-      return value as "html" | "text" | "json"
-    }, "html")
+    .option(
+      "--format <format>",
+      "Output format: html, text, or json",
+      (value: string) => {
+        const validFormats = ["html", "text", "json"]
+        if (!validFormats.includes(value)) {
+          throw new InvalidArgumentError(
+            `Must be one of: ${validFormats.join(", ")}`,
+          )
+        }
+        return value as "html" | "text" | "json"
+      },
+      "html",
+    )
     .option("--output <file>", "Save report to file instead of serving")
     .option("--no-open", "Do not open report in browser")
     .action(

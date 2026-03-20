@@ -63,8 +63,7 @@ function readSessionCSV(filePath: string): SessionRow[] {
 // ---------------------------------------------------------------------------
 
 // SockJS frame pattern: ["N#N|m|{payload}"] or ["N|m|{payload}"]
-const sockjsMessagePattern =
-  /^(a?\[")([0-9A-F*]+#)?(\d+)(\|[mc]\|)(.*)("\])$/
+const sockjsMessagePattern = /^(a?\[")([0-9A-F*]+#)?(\d+)(\|[mc]\|)(.*)("\])$/
 
 // SockJS init frame: ["0#0|o|"] or ["0|o|"]
 const sockjsInitPattern = /^\["0(#\d+)?\|o\|/
@@ -118,8 +117,7 @@ function wsRecvLabel(parsed: RecordingObj): string {
       | undefined
 
     const hasValues = Object.keys(values).length > 0
-    const hasInputMsgs =
-      inputMessages !== undefined && inputMessages.length > 0
+    const hasInputMsgs = inputMessages !== undefined && inputMessages.length > 0
 
     // Filter out silent errors
     let errorNames: string[] = []

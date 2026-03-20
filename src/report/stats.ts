@@ -42,9 +42,11 @@ function percentile(values: number[], p: number): number {
   return sorted[Math.max(0, idx)]!
 }
 
-function linearRegression(
-  points: { x: number; y: number }[],
-): { slope: number; intercept: number; maxError: number } {
+function linearRegression(points: { x: number; y: number }[]): {
+  slope: number
+  intercept: number
+  maxError: number
+} {
   const n = points.length
   if (n < 2) return { slope: 0, intercept: 0, maxError: 0 }
   const sumX = sum(points.map((p) => p.x))
@@ -286,7 +288,11 @@ export function computeSessionDurations(
   recordingDurationMs: number,
 ): SessionDurationStats {
   const bySess = groupBy(paired, (e) => String(e.session_id))
-  const sessions: { session_id: number; duration: number; maintenance: boolean }[] = []
+  const sessions: {
+    session_id: number
+    duration: number
+    maintenance: boolean
+  }[] = []
 
   for (const [, events] of bySess) {
     const start = Math.min(...events.map((e) => e.start))
@@ -312,9 +318,7 @@ export function computeEventDurations(
   recording: ReportData["recording"],
 ): EventDurationStat[] {
   const allData = runs.flatMap((run, ri) =>
-    run.paired
-      .filter((d) => d.maintenance)
-      .map((d) => ({ ...d, run_idx: ri })),
+    run.paired.filter((d) => d.maintenance).map((d) => ({ ...d, run_idx: ri })),
   )
 
   if (allData.length === 0) return []
@@ -336,7 +340,8 @@ export function computeEventDurations(
       min_time: times[0]!,
       max_time: times[n - 1]!,
       mean_time: sum(times) / n,
-      median_time: n % 2 === 1 ? times[mid]! : (times[mid - 1]! + times[mid]!) / 2,
+      median_time:
+        n % 2 === 1 ? times[mid]! : (times[mid - 1]! + times[mid]!) / 2,
       count: n,
     }
   })
@@ -369,9 +374,7 @@ export function computeEventConcurrency(
   recording: ReportData["recording"],
 ): EventConcurrencyStat[] {
   const allData = runs.flatMap((run, ri) =>
-    run.paired
-      .filter((d) => d.maintenance)
-      .map((d) => ({ ...d, run_idx: ri })),
+    run.paired.filter((d) => d.maintenance).map((d) => ({ ...d, run_idx: ri })),
   )
 
   if (allData.length === 0) return []
@@ -519,9 +522,7 @@ export function computeRunStats(
 
 export function computeReportStats(data: ReportData): ReportStats {
   const processedRuns = data.runs.map(processRun)
-  const runs = processedRuns.map((run) =>
-    computeRunStats(run, data.recording),
-  )
+  const runs = processedRuns.map((run) => computeRunStats(run, data.recording))
   return {
     runs,
     aggregate: {

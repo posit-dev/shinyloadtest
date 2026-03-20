@@ -7,9 +7,12 @@ import type { AppState } from "../types"
 export function renderWaterfall(state: AppState): void {
   const el = clearChart("waterfall-chart")
   const allData = state.runs[state.currentRunIdx].paired
-  if (allData.length === 0) { el.textContent = "No data"; return }
+  if (allData.length === 0) {
+    el.textContent = "No data"
+    return
+  }
 
-  const labelOrder = state.rawData.recording.events.map(e => e.label)
+  const labelOrder = state.rawData.recording.events.map((e) => e.label)
 
   const sessMin = new Map<number, number>()
   for (const d of allData) {
@@ -18,7 +21,7 @@ export function renderWaterfall(state: AppState): void {
   }
 
   const waterfallData = allData
-    .map(d => ({
+    .map((d) => ({
       session_id: d.session_id,
       maintenance: d.maintenance,
       relEnd: d.end - sessMin.get(d.session_id)!,
@@ -28,13 +31,15 @@ export function renderWaterfall(state: AppState): void {
     }))
     .sort((a, b) => a.input_line_number - b.input_line_number)
 
-  const maintData = waterfallData.filter(d => d.maintenance)
-  const nonMaintData = waterfallData.filter(d => !d.maintenance)
-  const maxConc = d3.max(maintData, d => d.concurrency) ?? 1
+  const maintData = waterfallData.filter((d) => d.maintenance)
+  const nonMaintData = waterfallData.filter((d) => !d.maintenance)
+  const maxConc = d3.max(maintData, (d) => d.concurrency) ?? 1
 
-  const maintRelEnds = maintData.map(d => d.relEnd)
-  const maintMin = maintRelEnds.length > 0 ? d3.min(maintRelEnds) ?? null : null
-  const maintMax = maintRelEnds.length > 0 ? d3.max(maintRelEnds) ?? null : null
+  const maintRelEnds = maintData.map((d) => d.relEnd)
+  const maintMin =
+    maintRelEnds.length > 0 ? (d3.min(maintRelEnds) ?? null) : null
+  const maintMax =
+    maintRelEnds.length > 0 ? (d3.max(maintRelEnds) ?? null) : null
 
   const marks: Plot.Markish[] = []
 
@@ -47,7 +52,7 @@ export function renderWaterfall(state: AppState): void {
         stroke: "#ccc",
         strokeWidth: 1,
         strokeOpacity: 0.4,
-      })
+      }),
     )
   }
 
@@ -59,20 +64,27 @@ export function renderWaterfall(state: AppState): void {
       stroke: "concurrency",
       strokeWidth: 1.5,
       strokeOpacity: 0.8,
-    })
+    }),
   )
 
   marks.push(
-    Plot.ruleY(maintData, Plot.pointerY({
-      y: "label",
-      stroke: "rgba(0,0,0,0.5)",
-      strokeWidth: 1,
-    }))
+    Plot.ruleY(
+      maintData,
+      Plot.pointerY({
+        y: "label",
+        stroke: "rgba(0,0,0,0.5)",
+        strokeWidth: 1,
+      }),
+    ),
   )
 
   if (maintMin !== null && nonMaintData.length > 0) {
     marks.push(
-      Plot.ruleX([maintMin, maintMax], { stroke: "rgba(0,0,0,0.7)", strokeDasharray: "4,4", strokeWidth: 0.5 })
+      Plot.ruleX([maintMin, maintMax], {
+        stroke: "rgba(0,0,0,0.7)",
+        strokeDasharray: "4,4",
+        strokeWidth: 0.5,
+      }),
     )
   }
 

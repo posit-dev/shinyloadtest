@@ -4,7 +4,10 @@ import * as url from "node:url"
 import { loadReportData } from "../../load.js"
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
-const resourcesBase = path.resolve(__dirname, "../../../../_resources/shinyloadtest/vignettes/test_sessions")
+const resourcesBase = path.resolve(
+  __dirname,
+  "../../../../_resources/shinyloadtest/vignettes/test_sessions",
+)
 const outDir = __dirname
 
 const demos = ["demo1", "demo4"] as const

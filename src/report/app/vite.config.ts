@@ -25,7 +25,10 @@ function devDataPlugin(): Plugin {
             const fixturePath = resolve(__dirname, "fixtures", `${name}.json`)
             json = readFileSync(fixturePath, "utf-8")
           } else {
-            const dirs = devDir.split(",").map((d) => d.trim()).filter(Boolean)
+            const dirs = devDir
+              .split(",")
+              .map((d) => d.trim())
+              .filter(Boolean)
             json = JSON.stringify(loadReportData(dirs))
           }
           res.setHeader("Content-Type", "application/json")
