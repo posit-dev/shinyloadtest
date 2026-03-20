@@ -5,14 +5,14 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./dist/main.js"
+    ".": "./dist/main.mjs"
   },
   "bin": {
-    "shinyloadtest": "dist/main.js",
-    "shinycannon": "dist/shinycannon.js"
+    "shinyloadtest": "dist/main.mjs",
+    "shinycannon": "dist/shinycannon.mjs"
   },
   "scripts": {
-    "build": "npm run build:report && tsup",
+    "build": "npm run build:report && tsdown",
     "build:report": "vite build --config src/report/app/vite.config.ts",
     "dev": "tsx src/main.ts",
     "dev:report": "vite dev --config src/report/app/vite.config.ts",
@@ -60,7 +60,7 @@
     "happy-dom": "^20.8.4",
     "pre-push": "^0.1.4",
     "prettier": "^3.5.3",
-    "tsup": "^8.4.0",
+    "tsdown": "^0.21.4",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^7.3.1",
