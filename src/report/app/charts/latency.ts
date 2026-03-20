@@ -29,11 +29,15 @@ function renderLatencyFaceted(
     )
     if (data.length === 0) continue
 
+    const card = document.createElement("div")
+    card.className = "run-card"
+    el.appendChild(card)
+
     if (state.runs.length > 1) {
       const label = document.createElement("p")
       label.className = "run-panel-label"
       label.textContent = run.name
-      el.appendChild(label)
+      card.appendChild(label)
     }
 
     const bySess = new Map<number, typeof data>()
@@ -124,7 +128,7 @@ function renderLatencyFaceted(
       marks,
     })
 
-    el.appendChild(chart)
+    card.appendChild(chart)
     enableTooltips(chart as unknown as HTMLElement)
   }
 

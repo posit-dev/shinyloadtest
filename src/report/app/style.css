@@ -85,13 +85,13 @@ body {
 .mobile-menu-toggle {
   display: none;
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: 8px;
+  left: 8px;
   z-index: 200;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 10px;
+  padding: 6px;
   cursor: pointer;
   color: var(--text);
   box-shadow: var(--shadow-card);
@@ -452,6 +452,28 @@ li.nav-group-label {
   margin-bottom: 4px;
 }
 
+.run-card {
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.run-card .run-panel-label {
+  margin-bottom: 8px;
+}
+
+.run-card figure {
+  width: 100%;
+  margin: 0;
+}
+
+.run-card svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ======================================================================
    Observable Plot overrides
    ====================================================================== */
@@ -516,7 +538,7 @@ figure {
     position: fixed;
     top: 0;
     left: 0;
-    width: 220px;
+    width: min-content;
     min-width: 220px;
     height: 100vh;
     transform: translateX(-100%);
@@ -529,10 +551,14 @@ figure {
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   }
 
+  .mobile-menu-toggle.hidden {
+    display: none;
+  }
+
   /* Offset content so toggle doesn't overlap text */
   .section-desc {
     padding: 1rem 1rem 0;
-    padding-top: 48px;
+    padding-top: 40px;
   }
   .section-desc:not(:first-child) {
     padding-top: 1rem;
@@ -562,7 +588,7 @@ figure {
   }
 
   .section-desc {
-    padding: 0.75rem 0.75rem 0;
+    padding: 40px 0.75rem 0;
   }
   .chart-area {
     padding: 0 0.75rem 1rem;

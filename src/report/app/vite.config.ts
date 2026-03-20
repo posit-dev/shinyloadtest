@@ -3,7 +3,7 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig, type Plugin } from "vite"
 import { viteSingleFile } from "vite-plugin-singlefile"
-import { loadReportData } from "../load"
+import { findOutputDirs, loadReportData } from "../load"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -25,10 +25,16 @@ function devDataPlugin(): Plugin {
             const fixturePath = resolve(__dirname, "fixtures", `${name}.json`)
             json = readFileSync(fixturePath, "utf-8")
           } else {
-            const dirs = devDir
+            let dirs = devDir
               .split(",")
               .map((d) => d.trim())
               .filter(Boolean)
+            if (dirs.length === 1) {
+              const discovered = findOutputDirs(dirs[0])
+              if (discovered.length > 0) {
+                dirs = discovered
+              }
+            }
             json = JSON.stringify(loadReportData(dirs))
           }
           res.setHeader("Content-Type", "application/json")

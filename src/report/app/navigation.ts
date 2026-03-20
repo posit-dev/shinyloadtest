@@ -62,10 +62,12 @@ export function setupNavigation(): void {
   function openSidebar() {
     sidebar.classList.add("open")
     sidebarOverlay.classList.add("visible")
+    menuToggle.classList.add("hidden")
   }
   function closeSidebar() {
     sidebar.classList.remove("open")
     sidebarOverlay.classList.remove("visible")
+    menuToggle.classList.remove("hidden")
   }
 
   menuToggle.addEventListener("click", () => {
