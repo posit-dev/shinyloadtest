@@ -1,6 +1,6 @@
 {
   "name": "@posit-dev/shinyloadtest",
-  "version": "2.0.0-alpha.2",
+  "version": "2.0.0-alpha.3",
   "description": "Load testing tool for Shiny applications",
   "type": "module",
   "sideEffects": false,
