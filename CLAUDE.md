@@ -1,6 +1,6 @@
 ## About shinyloadtest
 
-`@posit-dev/shinyloadtest` — a TypeScript/Node.js CLI tool for loadtesting [Shiny apps](https://shiny.posit.co/).
+`shinyloadtest` — a TypeScript/Node.js CLI tool for loadtesting [Shiny apps](https://shiny.posit.co/).
 It is a rewrite and consolidation of [shinycannon](https://github.com/rstudio/shinycannon) (originally Kotlin/JVM) and the [shinyloadtest](https://rstudio.github.io/shinyloadtest) (R package and HTML/JavaScript assets).
 
 We forked `rstudio/shinycannon` into `posit-dev/shinyloadtest` for the rewrite.

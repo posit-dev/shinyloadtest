@@ -11,13 +11,13 @@ Requires **Node.js 20+**.
 Install globally via npm:
 
 ```bash
-npm install -g @posit-dev/shinyloadtest
+npm install -g shinyloadtest
 ```
 
 Or run directly with npx:
 
 ```bash
-npx @posit-dev/shinyloadtest --help
+npx shinyloadtest --help
 ```
 
 ## Quick Start

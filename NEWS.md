@@ -1,10 +1,10 @@
 # shinyloadtest 2.0.0 (development)
 
 This release is a complete rewrite of shinycannon in TypeScript/Node.js,
-published as `@posit-dev/shinyloadtest` on npm.
+published as `shinyloadtest` on npm.
 
-* Install via `npm install -g @posit-dev/shinyloadtest` or run directly with
-  `npx @posit-dev/shinyloadtest`. The `npx shinycannon` shorthand is also
+* Install via `npm install -g shinyloadtest` or run directly with
+  `npx shinyloadtest`. The `npx shinycannon` shorthand is also
   supported via a stub package.
 
 * The primary CLI command is now `shinyloadtest replay <recording> [app-url]`.
