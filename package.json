@@ -24,11 +24,12 @@
     "format": "oxfmt src/",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/report/app/tsconfig.json",
     "prepack": "npm run build",
-    "pre-push": "npx oxfmt --check src/ && npm run lint && npm run typecheck"
+    "pre-push": "npx oxfmt --check src/ && npm run lint && npm run typecheck",
+    "prepare": "simple-git-hooks"
   },
-  "pre-push": [
-    "pre-push"
-  ],
+  "simple-git-hooks": {
+    "pre-push": "npm run pre-push"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -52,15 +53,15 @@
     "@observablehq/plot": "^0.6.17",
     "@types/d3": "^7.4.3",
     "@types/node": "^20.17.24",
-    "d3": "^7.9.0",
     "@types/tough-cookie": "^4.0.5",
     "@types/ws": "^8.18.0",
     "@typescript-eslint/eslint-plugin": "^8.27.0",
     "@typescript-eslint/parser": "^8.27.0",
+    "d3": "^7.9.0",
     "eslint": "^9.21.0",
     "happy-dom": "^20.8.4",
     "oxfmt": "^0.41.0",
-    "pre-push": "^0.1.4",
+    "simple-git-hooks": "^2.13.1",
     "tsdown": "^0.21.4",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
