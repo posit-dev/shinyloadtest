@@ -99,6 +99,20 @@ describe("canIgnore", () => {
     expect(canIgnore('{"custom":{"reactlog":{"some":"data"}}}')).toBe(true)
   })
 
+  it("ignores shinywidgets_comm_msg custom messages", () => {
+    expect(
+      canIgnore('{"custom":{"shinywidgets_comm_msg":"{\\"some\\":\\"data\\"}"}}'),
+    ).toBe(true)
+  })
+
+  it("does not ignore shinywidgets_comm_open custom messages", () => {
+    expect(
+      canIgnore(
+        '{"custom":{"shinywidgets_comm_open":"{\\"some\\":\\"data\\"}"}}',
+      ),
+    ).toBe(false)
+  })
+
   it("does not ignore non-reactlog custom messages", () => {
     expect(canIgnore('{"custom":{"credentials":null}}')).toBe(false)
   })

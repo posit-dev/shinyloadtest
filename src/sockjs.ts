@@ -88,7 +88,7 @@ export function canIgnore(message: string): boolean {
     if (IGNORABLE_KEYS.has(key)) return true
   }
 
-  // Step 5: reactlog custom message
+  // Step 5: ignorable custom messages (reactlog, shinywidgets_comm_msg)
   if (
     keys.length === 1 &&
     keys[0] === "custom" &&
@@ -96,7 +96,15 @@ export function canIgnore(message: string): boolean {
     parsed["custom"] !== null
   ) {
     const customKeys = Object.keys(parsed["custom"] as Record<string, unknown>)
-    if (customKeys.length === 1 && customKeys[0] === "reactlog") return true
+    if (customKeys.length === 1) {
+      // reactlog: debug tracing, never needed for replay
+      if (customKeys[0] === "reactlog") return true
+      // shinywidgets_comm_msg: widget comm protocol messages (echo_update,
+      // state updates). The replayer has no widget model and doesn't use
+      // their content; pacing is handled by sleepBefore(). Note:
+      // shinywidgets_comm_open is NOT ignored — it provides comm_id mapping.
+      if (customKeys[0] === "shinywidgets_comm_msg") return true
+    }
   }
 
   // Step 6: empty update message (all three fields are empty).
