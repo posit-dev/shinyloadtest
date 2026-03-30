@@ -123,6 +123,8 @@ export interface SessionConfig {
   argsString: string
   argsJson: string
   signal?: AbortSignal
+  /** Called after each recording event is processed. */
+  onProgress?: (eventIndex: number, totalEvents: number) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +491,7 @@ async function handleWsRecv(
     (msg) => messageKeys(msg) === expectingKeys,
   )
   if (bufIdx !== -1) {
-    const [matched] = state.reorderBuffer.splice(bufIdx, 1)!
+    const matched = state.reorderBuffer.splice(bufIdx, 1)[0]!
     state.logger.debug(`WS_RECV matched from reorder buffer: ${matched}`)
     const receivedObj = parseMessage(normalizeMessage(matched))
     extractCommIdMapping(expectingObj, receivedObj, state)
@@ -770,6 +772,8 @@ export async function runSession(
     started = true
 
     let lastEventEnded: number | null = null
+    const totalEvents = recording.events.length
+    let eventIndex = 0
 
     for (const event of recording.events) {
       const sleepFor = sleepBefore(
@@ -822,6 +826,7 @@ export async function runSession(
 
       await handleEvent(event, state)
       stats.recordEvent()
+      config.onProgress?.(++eventIndex, totalEvents)
 
       writer.writeCsv(
         sessionId,

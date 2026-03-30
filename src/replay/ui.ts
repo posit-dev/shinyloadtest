@@ -76,6 +76,8 @@ export class ReplayTerminalUI {
   private spinner: Ora
   private updateTimer: ReturnType<typeof setInterval> | null = null
   private warmupCount = 0
+  /** Per-worker warmup progress: [eventIndex, totalEvents] */
+  private warmupProgress: Map<number, [number, number]> = new Map()
   private loadedStartTime = 0
   private loadedDurationMs = 0
   private getStats: (() => StatsCounts) | null = null
@@ -108,7 +110,15 @@ export class ReplayTerminalUI {
 
   startWarmup(): void {
     this.warmupCount = 0
+    this.warmupProgress = new Map()
     this.spinner.start(this.warmupText())
+    this.updateTimer = setInterval(() => {
+      this.spinner.text = this.warmupText()
+    }, 250)
+  }
+
+  workerProgress(workerId: number, eventIndex: number, totalEvents: number): void {
+    this.warmupProgress.set(workerId, [eventIndex, totalEvents])
   }
 
   workerReady(): void {
@@ -117,6 +127,7 @@ export class ReplayTerminalUI {
   }
 
   startLoaded(getStats: () => StatsCounts): void {
+    this.stopUpdates()
     this.getStats = getStats
     this.loadedStartTime = Date.now()
     this.loadedDurationMs = this.config.loadedDurationMinutes * 60_000
@@ -166,7 +177,71 @@ export class ReplayTerminalUI {
   }
 
   private warmupText(): string {
-    return `Warming up ${dim(`(${this.warmupCount}/${this.config.workers} ready)`)}`
+    const { workers } = this.config
+
+    if (this.warmupProgress.size === 0) {
+      return `Warming up ${dim(`(${this.warmupCount}/${workers} ready)`)}`
+    }
+
+    if (workers > 5) {
+      return this.warmupTextCombined()
+    }
+
+    return this.warmupTextPerWorker()
+  }
+
+  private warmupTextPerWorker(): string {
+    const { workers } = this.config
+    const lines: string[] = [
+      `${bold("Warming up")} ${dim(`(${this.warmupCount}/${workers} ready)`)}`,
+    ]
+
+    for (let i = 0; i < workers; i++) {
+      const progress = this.warmupProgress.get(i)
+      const label = `Worker ${i + 1}`
+      if (!progress) {
+        // Worker hasn't started yet
+        lines.push(`  ${dim(label.padEnd(10))} ${dim("waiting...")}`)
+      } else {
+        const [done, total] = progress
+        const fraction = total > 0 ? done / total : 0
+        const pct = Math.round(fraction * 100)
+        lines.push(
+          `  ${dim(label.padEnd(10))} ${progressBar(fraction, 25)}  ${bold(String(pct))}${dim("%")}`,
+        )
+      }
+    }
+
+    return lines.join("\n")
+  }
+
+  private warmupTextCombined(): string {
+    const { workers } = this.config
+    let totalDone = 0
+    let totalEvents = 0
+
+    for (let i = 0; i < workers; i++) {
+      const progress = this.warmupProgress.get(i)
+      if (progress) {
+        totalDone += progress[0]
+        totalEvents += progress[1]
+      } else {
+        // Workers that haven't started contribute their share of totalEvents
+        // from the first worker that has started (they'll all run the same recording)
+        const first = this.warmupProgress.values().next().value
+        if (first) totalEvents += first[1]
+      }
+    }
+
+    const fraction = totalEvents > 0 ? totalDone / totalEvents : 0
+    const pct = Math.round(fraction * 100)
+
+    const lines = [
+      `${bold("Warming up")} ${dim(`(${this.warmupCount}/${workers} workers ready)`)}`,
+      `  ${progressBar(fraction, 30)}  ${bold(String(pct))}${dim("%")}`,
+    ]
+
+    return lines.join("\n")
   }
 
   private loadedText(): string {

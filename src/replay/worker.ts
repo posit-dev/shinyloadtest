@@ -128,7 +128,11 @@ export async function runEnduranceTest(
 
     // First session (warmup)
     try {
-      await runSession(buildSessionConfig(), stats)
+      const warmupConfig = buildSessionConfig()
+      warmupConfig.onProgress = (eventIndex, totalEvents) => {
+        ui?.workerProgress(workerId, eventIndex, totalEvents)
+      }
+      await runSession(warmupConfig, stats)
     } finally {
       warmupResolvers[workerId]!()
       ui?.workerReady()
