@@ -221,6 +221,9 @@ async function maybeLogin(
 /** Max messages to read ahead when looking for a key-matching message. */
 const WS_RECV_LOOKAHEAD = 15
 
+/** Timeout (ms) for the first receive poll in handleWsRecv. */
+const WS_RECV_POLL_MS = 30_000
+
 /** Short timeout (ms) for lookahead polls after the first receive. */
 const WS_RECV_LOOKAHEAD_POLL_MS = 2_000
 
@@ -493,32 +496,37 @@ async function handleWsRecv(
     return
   }
 
-  // 2. Receive one message with normal (full) timeout — this provides pacing.
-  const firstStr = await receiveNext(event, state)
-  const firstKeys = messageKeys(firstStr)
+  // 2. Poll for messages: first attempt uses a longer timeout (pacing), then
+  //    shorter lookahead polls. This is bounded so we never block forever if
+  //    the server doesn't send the expected message.
+  for (let attempt = 0; attempt <= WS_RECV_LOOKAHEAD; attempt++) {
+    const timeoutMs =
+      attempt === 0 ? WS_RECV_POLL_MS : WS_RECV_LOOKAHEAD_POLL_MS
 
-  if (expectingKeys === firstKeys) {
-    const receivedObj = parseMessage(normalizeMessage(firstStr))
-    extractCommIdMapping(expectingObj, receivedObj, state)
-    return
-  }
-
-  // Mismatch — buffer and try short-timeout lookahead for more queued messages.
-  state.reorderBuffer.push(firstStr)
-  state.logger.debug(
-    `WS_RECV reorder: buffered [${firstKeys}], looking for [${expectingKeys}]`,
-  )
-
-  for (let attempt = 0; attempt < WS_RECV_LOOKAHEAD; attempt++) {
     const msg = await state.webSocket.receiveQueue.poll(
-      WS_RECV_LOOKAHEAD_POLL_MS,
+      timeoutMs,
       state.signal,
     )
-    if (msg === null) break // Nothing available, stop looking ahead.
+
+    if (state.signal?.aborted) throw state.signal.reason ?? new Error("Aborted")
+
+    if (msg === null) {
+      if (attempt === 0) {
+        // First poll timed out — no message at all. Warn and skip.
+        state.logger.warn(
+          `WS_RECV line ${event.lineNumber}: no message received after ${timeoutMs / 1000}s, skipping`,
+        )
+        return
+      }
+      break // Lookahead exhausted, fall through to warn.
+    }
+
     if (msg.kind === "error") throw msg.error
 
     const receivedStr = msg.text
-    state.logger.debug(`WS_RECV lookahead received: ${receivedStr}`)
+    state.logger.debug(
+      `WS_RECV ${attempt === 0 ? "received" : "lookahead received"}: ${receivedStr}`,
+    )
     const receivedKeys = messageKeys(receivedStr)
 
     if (expectingKeys === receivedKeys) {
@@ -527,6 +535,7 @@ async function handleWsRecv(
       return
     }
 
+    // Mismatch — buffer for a later WS_RECV.
     state.reorderBuffer.push(receivedStr)
     state.logger.debug(
       `WS_RECV reorder: buffered [${receivedKeys}], looking for [${expectingKeys}]`,
