@@ -16,6 +16,13 @@ const IGNORABLE_REGEXES = [/^a\["ACK/, /^\["ACK/, /^h$/]
 // Keys whose presence in a parsed message means it can be ignored
 const IGNORABLE_KEYS = new Set(["busy", "progress", "recalculating"])
 
+/** Check if a value is an empty array or an empty plain object. */
+function isEmpty(v: unknown): boolean {
+  if (Array.isArray(v)) return v.length === 0
+  if (typeof v === "object" && v !== null) return Object.keys(v).length === 0
+  return false
+}
+
 /**
  * Normalize reconnect-enabled message IDs to "*" for deterministic matching.
  * Replaces e.g. `a["A3#` with `a["*#`.
@@ -92,7 +99,9 @@ export function canIgnore(message: string): boolean {
     if (customKeys.length === 1 && customKeys[0] === "reactlog") return true
   }
 
-  // Step 6: empty update message (exact match: all three fields are empty arrays)
+  // Step 6: empty update message (all three fields are empty).
+  // Shiny for R sends empty arrays ([], [], []);
+  // Shiny for Python sends empty objects for errors/values ({}, {}, []).
   if (keys.length === 3) {
     const errors = parsed["errors"]
     const values = parsed["values"]
@@ -100,10 +109,8 @@ export function canIgnore(message: string): boolean {
     if (
       Array.isArray(inputMessages) &&
       inputMessages.length === 0 &&
-      Array.isArray(errors) &&
-      errors.length === 0 &&
-      Array.isArray(values) &&
-      values.length === 0
+      isEmpty(errors) &&
+      isEmpty(values)
     ) {
       return true
     }
