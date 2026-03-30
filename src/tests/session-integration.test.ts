@@ -256,8 +256,9 @@ describe("Session Integration", { timeout: 30000 }, () => {
     }
   })
 
-  it("BC-04: WS_RECV fails when received keys differ from expected", async () => {
-    // Server responds with completely different keys
+  it("BC-04: WS_RECV warns but completes when received keys differ from expected", async () => {
+    // Server responds with completely different keys — session should still
+    // complete because key mismatch is non-fatal (logged as a warning).
     const altMock = new MockShinyServer({
       wsRecvResponse: JSON.stringify({
         differentKey: true,
@@ -312,8 +313,8 @@ describe("Session Integration", { timeout: 30000 }, () => {
         .map((l) => l.split(",")[3]!)
         .filter(Boolean)
 
-      expect(events).toContain("PLAYBACK_FAIL")
-      expect(stats.getCounts().failed).toBe(1)
+      expect(events).toContain("PLAYBACK_DONE")
+      expect(stats.getCounts().done).toBe(1)
     } finally {
       if (tmpDir2) fs.rmSync(tmpDir2, { recursive: true, force: true })
       await altMock.stop()

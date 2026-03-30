@@ -218,6 +218,12 @@ async function maybeLogin(
 // Event handlers
 // ---------------------------------------------------------------------------
 
+/** Max messages to read ahead when looking for a key-matching message. */
+const WS_RECV_LOOKAHEAD = 15
+
+/** Short timeout (ms) for lookahead polls after the first receive. */
+const WS_RECV_LOOKAHEAD_POLL_MS = 2_000
+
 interface SessionState {
   httpClient: HttpClient
   httpUrl: string
@@ -230,6 +236,8 @@ interface SessionState {
   headers: Record<string, string>
   creds: Creds
   signal?: AbortSignal
+  /** Messages received out of order, waiting to be matched by a later WS_RECV. */
+  reorderBuffer: string[]
 }
 
 function replaceSessionTokens(
@@ -432,6 +440,12 @@ function handleWsSend(
   state.logger.debug(`WS_SEND sent: ${text}`)
 }
 
+/** Parse a raw WS message and return its sorted top-level key string. */
+function messageKeys(raw: string): string {
+  const obj = parseMessage(normalizeMessage(raw))
+  return obj ? Object.keys(obj).sort().join(",") : ""
+}
+
 async function handleWsRecv(
   event: RecordingEvent & { type: "WS_RECV" },
   state: SessionState,
@@ -440,13 +454,6 @@ async function handleWsRecv(
     throw new Error("Tried to WS_RECV but no websocket is open")
   }
 
-  const receivedStr = await state.webSocket.receive((elapsed) => {
-    state.logger.warn(
-      `WS_RECV line ${event.lineNumber}: Haven't received message after ${elapsed} seconds`,
-    )
-  }, state.signal)
-  state.logger.debug(`WS_RECV received: ${receivedStr}`)
-
   const expectingStr = replaceSessionTokens(
     event.message,
     state.tokenDictionary,
@@ -454,26 +461,87 @@ async function handleWsRecv(
   const expectingObj = parseMessage(expectingStr)
 
   if (expectingObj === null) {
-    // String comparison (e.g. the "o" open frame)
+    // String comparison (e.g. the "o" open frame) — must match exactly.
+    const receivedStr = await receiveNext(event, state)
     if (expectingStr !== receivedStr) {
       throw new Error(`Expected string ${expectingStr} but got ${receivedStr}`)
     }
-  } else {
-    const receivedNormalized = normalizeMessage(receivedStr)
-    const receivedObj = parseMessage(receivedNormalized)
-    const expectingKeys = Object.keys(expectingObj).sort().join(",")
-    const receivedKeys = receivedObj
-      ? Object.keys(receivedObj).sort().join(",")
-      : ""
-    if (expectingKeys !== receivedKeys) {
-      throw new Error(
-        `Objects don't have same keys: expected [${expectingKeys}], got [${receivedKeys}]`,
-      )
+    return
+  }
+
+  const expectingKeys = Object.keys(expectingObj).sort().join(",")
+
+  // 1. Check the reorder buffer for an already-received matching message.
+  const bufIdx = state.reorderBuffer.findIndex(
+    (msg) => messageKeys(msg) === expectingKeys,
+  )
+  if (bufIdx !== -1) {
+    const [matched] = state.reorderBuffer.splice(bufIdx, 1)!
+    state.logger.debug(`WS_RECV matched from reorder buffer: ${matched}`)
+    const receivedObj = parseMessage(normalizeMessage(matched))
+    extractCommIdMapping(expectingObj, receivedObj, state)
+    return
+  }
+
+  // 2. Receive one message with normal (full) timeout — this provides pacing.
+  const firstStr = await receiveNext(event, state)
+  const firstKeys = messageKeys(firstStr)
+
+  if (expectingKeys === firstKeys) {
+    const receivedObj = parseMessage(normalizeMessage(firstStr))
+    extractCommIdMapping(expectingObj, receivedObj, state)
+    return
+  }
+
+  // Mismatch — buffer and try short-timeout lookahead for more queued messages.
+  state.reorderBuffer.push(firstStr)
+  state.logger.debug(
+    `WS_RECV reorder: buffered [${firstKeys}], looking for [${expectingKeys}]`,
+  )
+
+  for (let attempt = 0; attempt < WS_RECV_LOOKAHEAD; attempt++) {
+    const msg = await state.webSocket.receiveQueue.poll(
+      WS_RECV_LOOKAHEAD_POLL_MS,
+      state.signal,
+    )
+    if (msg === null) break // Nothing available, stop looking ahead.
+    if (msg.kind === "error") throw msg.error
+
+    const receivedStr = msg.text
+    state.logger.debug(`WS_RECV lookahead received: ${receivedStr}`)
+    const receivedKeys = messageKeys(receivedStr)
+
+    if (expectingKeys === receivedKeys) {
+      const receivedObj = parseMessage(normalizeMessage(receivedStr))
+      extractCommIdMapping(expectingObj, receivedObj, state)
+      return
     }
 
-    // Extract comm_id mapping from shinywidgets_comm_open messages
-    extractCommIdMapping(expectingObj, receivedObj, state)
+    state.reorderBuffer.push(receivedStr)
+    state.logger.debug(
+      `WS_RECV reorder: buffered [${receivedKeys}], looking for [${expectingKeys}]`,
+    )
   }
+
+  // No match found — warn and continue. For load testing, strict key matching
+  // is less important than keeping the session alive and pacing sends.
+  state.logger.warn(
+    `WS_RECV line ${event.lineNumber}: expected [${expectingKeys}] but no match found after lookahead, continuing`,
+  )
+}
+
+/** Receive the next non-ignorable message from the WebSocket. */
+async function receiveNext(
+  event: RecordingEvent & { type: "WS_RECV" | "WS_RECV_INIT" | "WS_RECV_BEGIN_UPLOAD" },
+  state: SessionState,
+): Promise<string> {
+  const receivedStr = await state.webSocket!.receive((elapsed) => {
+    state.logger.warn(
+      `${event.type} line ${event.lineNumber}: Haven't received message after ${elapsed} seconds`,
+    )
+  }, state.signal)
+  state.logger.debug(`${event.type} received: ${receivedStr}`)
+  return receivedStr
 }
 
 async function handleWsRecvInit(
@@ -635,6 +703,7 @@ export async function runSession(
     headers,
     creds,
     signal,
+    reorderBuffer: [],
   }
 
   let started = false
