@@ -117,7 +117,11 @@ export class ReplayTerminalUI {
     }, 250)
   }
 
-  workerProgress(workerId: number, eventIndex: number, totalEvents: number): void {
+  workerProgress(
+    workerId: number,
+    eventIndex: number,
+    totalEvents: number,
+  ): void {
     this.warmupProgress.set(workerId, [eventIndex, totalEvents])
   }
 

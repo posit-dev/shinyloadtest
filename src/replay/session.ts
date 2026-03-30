@@ -505,10 +505,7 @@ async function handleWsRecv(
     const timeoutMs =
       attempt === 0 ? WS_RECV_POLL_MS : WS_RECV_LOOKAHEAD_POLL_MS
 
-    const msg = await state.webSocket.receiveQueue.poll(
-      timeoutMs,
-      state.signal,
-    )
+    const msg = await state.webSocket.receiveQueue.poll(timeoutMs, state.signal)
 
     if (state.signal?.aborted) throw state.signal.reason ?? new Error("Aborted")
 
@@ -553,7 +550,9 @@ async function handleWsRecv(
 
 /** Receive the next non-ignorable message from the WebSocket. */
 async function receiveNext(
-  event: RecordingEvent & { type: "WS_RECV" | "WS_RECV_INIT" | "WS_RECV_BEGIN_UPLOAD" },
+  event: RecordingEvent & {
+    type: "WS_RECV" | "WS_RECV_INIT" | "WS_RECV_BEGIN_UPLOAD"
+  },
   state: SessionState,
 ): Promise<string> {
   const receivedStr = await state.webSocket!.receive((elapsed) => {

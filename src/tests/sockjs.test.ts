@@ -72,9 +72,7 @@ describe("canIgnore", () => {
   })
 
   it("ignores empty update messages (Python Shiny format with objects)", () => {
-    expect(canIgnore('{"values":{},"inputMessages":[],"errors":{}}')).toBe(
-      true,
-    )
+    expect(canIgnore('{"values":{},"inputMessages":[],"errors":{}}')).toBe(true)
     expect(
       canIgnore(
         'a["2#0|m|{\\"errors\\":{},\\"values\\":{},\\"inputMessages\\":[]}"]',
@@ -101,7 +99,9 @@ describe("canIgnore", () => {
 
   it("ignores shinywidgets_comm_msg custom messages", () => {
     expect(
-      canIgnore('{"custom":{"shinywidgets_comm_msg":"{\\"some\\":\\"data\\"}"}}'),
+      canIgnore(
+        '{"custom":{"shinywidgets_comm_msg":"{\\"some\\":\\"data\\"}"}}',
+      ),
     ).toBe(true)
   })
 
