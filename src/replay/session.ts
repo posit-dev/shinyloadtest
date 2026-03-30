@@ -26,7 +26,7 @@ import {
 } from "../http.js"
 import type { Logger } from "../logger.js"
 import { SessionWriter } from "./output.js"
-import { normalizeMessage, parseMessage } from "../sockjs.js"
+import { canIgnore, normalizeMessage, parseMessage } from "../sockjs.js"
 import { replaceTokens, createTokenDictionary } from "../tokens.js"
 import type { Recording, RecordingEvent, Creds } from "../types.js"
 import {
@@ -452,6 +452,16 @@ async function handleWsRecv(
 ): Promise<void> {
   if (state.webSocket === null) {
     throw new Error("Tried to WS_RECV but no websocket is open")
+  }
+
+  // Skip WS_RECV events whose expected message would now be filtered by
+  // canIgnore. This handles recordings made before canIgnore was updated
+  // (e.g. Shiny for Python empty updates with object-typed errors/values).
+  if (canIgnore(normalizeMessage(event.message))) {
+    state.logger.debug(
+      `WS_RECV line ${event.lineNumber}: expected message is now ignorable, skipping`,
+    )
+    return
   }
 
   const expectingStr = replaceSessionTokens(
