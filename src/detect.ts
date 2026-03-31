@@ -10,6 +10,23 @@ import type { HttpClient } from "./http.js"
 import { HttpStatusError } from "./http.js"
 
 // ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when the target URL does not appear to be a Shiny application.
+ */
+export class AppDetectionError extends Error {
+  readonly url: string
+
+  constructor(url: string) {
+    super(`Target URL does not appear to be a Shiny application: ${url}`)
+    this.name = "AppDetectionError"
+    this.url = url
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -83,7 +100,5 @@ export async function detectServerType(
   }
 
   // Step 5: nothing matched
-  throw new Error(
-    `Target URL ${appUrl} does not appear to be a Shiny application.`,
-  )
+  throw new AppDetectionError(appUrl)
 }

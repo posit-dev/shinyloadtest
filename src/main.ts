@@ -11,7 +11,7 @@ import { createOutputDir } from "./replay/output.js"
 import { runEnduranceTest } from "./replay/worker.js"
 import { SERVER_TYPE_NAMES, ServerType } from "./types.js"
 import { HttpClient, HttpStatusError } from "./http.js"
-import { detectServerType } from "./detect.js"
+import { detectServerType, AppDetectionError } from "./detect.js"
 import { ReplayTerminalUI } from "./replay/ui.js"
 
 async function main(): Promise<void> {
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
       )
     }
   } catch (err) {
-    if (err instanceof HttpStatusError) {
+    if (err instanceof HttpStatusError || err instanceof AppDetectionError) {
       throw err
     }
     logger.warn(
@@ -216,9 +216,49 @@ function httpStatusHint(status: number): string {
   return ""
 }
 
+function formatAppDetectionError(err: AppDetectionError): string {
+  const w = process.stderr.isTTY
+  const lines: string[] = []
+
+  lines.push("")
+  lines.push(
+    w
+      ? `  ${red("\u2716")} ${bold(red("Not a Shiny application"))}`
+      : `  x Not a Shiny application`,
+  )
+  lines.push("")
+  lines.push(w ? `  ${dim("URL:")}  ${bold(err.url)}` : `  URL:  ${err.url}`)
+  lines.push("")
+
+  const hint = appDetectionHint(err.url)
+  if (hint) {
+    lines.push(w ? `  ${yellow(hint)}` : `  ${hint}`)
+    lines.push("")
+  }
+
+  return lines.join("\n")
+}
+
+function appDetectionHint(url: string): string {
+  if (url.includes("#")) {
+    return (
+      "The URL contains a '#' fragment. If this is a Posit Connect dashboard\n" +
+      "  URL, use the content URL (solo mode) instead."
+    )
+  }
+  return (
+    "Verify the URL points directly to a deployed Shiny application.\n" +
+    "  The page at this URL did not contain a Shiny JavaScript reference."
+  )
+}
+
 main().catch((err: unknown) => {
   if (err instanceof HttpStatusError) {
     process.stderr.write(formatHttpStatusError(err))
+    process.exit(1)
+  }
+  if (err instanceof AppDetectionError) {
+    process.stderr.write(formatAppDetectionError(err))
     process.exit(1)
   }
   const message = err instanceof Error ? err.message : String(err)
