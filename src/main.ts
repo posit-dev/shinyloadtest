@@ -105,6 +105,9 @@ async function main(): Promise<void> {
     )
   }
 
+  // max-errors: user value if provided, otherwise workers * 5. 0 = unlimited.
+  const maxErrors = args.maxErrors !== null ? args.maxErrors : args.workers * 5
+
   const { argsString, argsJson } = serializeArgs(args)
 
   const ui = process.stderr.isTTY
@@ -113,6 +116,7 @@ async function main(): Promise<void> {
         appUrl: args.appUrl,
         workers: args.workers,
         loadedDurationMinutes: args.loadedDurationMinutes,
+        maxErrors,
         outputDir: args.outputDir,
       })
     : undefined
@@ -154,6 +158,7 @@ async function main(): Promise<void> {
     numWorkers: args.workers,
     warmupInterval: startInterval,
     loadedDurationMinutes: args.loadedDurationMinutes,
+    maxErrors,
     outputDir: args.outputDir,
     logger,
     argsString,

@@ -49,6 +49,7 @@ describe("serializeArgs", () => {
       workers: 3,
       loadedDurationMinutes: 10,
       startInterval: null,
+      maxErrors: null,
       headers: {},
       outputDir: "/tmp/output",
       overwriteOutput: false,

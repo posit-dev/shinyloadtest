@@ -81,6 +81,7 @@ async function runTest(
     numWorkers: 1,
     warmupInterval: 10,
     loadedDurationMinutes: 0.005,
+    maxErrors: 0,
     outputDir,
     logger,
     argsString: "test",

@@ -23,11 +23,30 @@ export interface EnduranceTestConfig {
   numWorkers: number
   warmupInterval: number
   loadedDurationMinutes: number
+  maxErrors: number
   outputDir: string
   logger: Logger
   argsString: string
   argsJson: string
   ui?: ReplayTerminalUI
+}
+
+/**
+ * Error thrown when the cumulative session failure count exceeds --max-errors.
+ */
+export class MaxErrorsExceededError extends Error {
+  readonly maxErrors: number
+  readonly totalFailures: number
+
+  constructor(maxErrors: number, totalFailures: number) {
+    super(
+      `Max errors exceeded (${totalFailures} failures, limit ${maxErrors}). ` +
+        `Use --max-errors to adjust or set to 0 to disable.`,
+    )
+    this.name = "MaxErrorsExceededError"
+    this.maxErrors = maxErrors
+    this.totalFailures = totalFailures
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +73,7 @@ export async function runEnduranceTest(
     numWorkers,
     warmupInterval,
     loadedDurationMinutes,
+    maxErrors,
     outputDir,
     logger,
     argsString,
@@ -82,6 +102,27 @@ export async function runEnduranceTest(
   let keepWorking = true
   const abortController = new AbortController()
 
+  // Max-errors: a promise that resolves when the threshold is exceeded.
+  // Used to interrupt the loaded-duration sleep.
+  let maxErrorsTriggered = false
+  let resolveMaxErrors: (() => void) | null = null
+  const maxErrorsPromise = new Promise<void>((resolve) => {
+    resolveMaxErrors = resolve
+  })
+
+  /** Check if cumulative failures have exceeded --max-errors. */
+  function checkMaxErrors(): void {
+    if (maxErrors > 0 && stats.getCounts().failed >= maxErrors) {
+      if (!maxErrorsTriggered) {
+        maxErrorsTriggered = true
+        logger.error(`Max errors (${maxErrors}) exceeded — stopping test`)
+        keepWorking = false
+        abortController.abort()
+        resolveMaxErrors?.()
+      }
+    }
+  }
+
   // Per-worker warmup resolve functions
   const warmupPromises: Promise<void>[] = []
   const warmupResolvers: Array<() => void> = []
@@ -103,6 +144,9 @@ export async function runEnduranceTest(
 
     // Stagger delay
     await sleep(workerId * warmupInterval)
+
+    if (maxErrorsTriggered) return
+
     workerLogger.info("Warming up")
 
     let iteration = 0
@@ -138,10 +182,13 @@ export async function runEnduranceTest(
       ui?.workerReady()
     }
 
+    checkMaxErrors()
+
     // Subsequent sessions
     while (keepWorking) {
       workerLogger.info("Running again")
       await runSession(buildSessionConfig(), stats)
+      checkMaxErrors()
     }
 
     workerLogger.info("Stopped")
@@ -158,10 +205,26 @@ export async function runEnduranceTest(
     logger.info("Waiting for warmup to complete")
     await Promise.all(warmupPromises)
 
+    if (maxErrorsTriggered) {
+      // Already exceeded during warmup — skip loaded phase
+      await Promise.all(workerPromises)
+      const counts = stats.getCounts()
+      ui?.finishMaxErrors(counts, maxErrors)
+      throw new MaxErrorsExceededError(maxErrors, counts.failed)
+    }
+
     // Maintain loaded duration
     logger.info(`Maintaining for ${loadedDurationMinutes} minutes`)
     ui?.startLoaded(() => stats.getCounts())
-    await sleep(loadedDurationMinutes * 60000)
+    await Promise.race([sleep(loadedDurationMinutes * 60000), maxErrorsPromise])
+
+    if (maxErrorsTriggered) {
+      // Exceeded during loaded phase
+      await Promise.all(workerPromises)
+      const counts = stats.getCounts()
+      ui?.finishMaxErrors(counts, maxErrors)
+      throw new MaxErrorsExceededError(maxErrors, counts.failed)
+    }
 
     // Signal workers to stop
     logger.info("Stopped maintaining, waiting for workers to stop")

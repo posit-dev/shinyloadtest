@@ -20,6 +20,7 @@ export interface ParsedArgs {
   workers: number
   loadedDurationMinutes: number
   startInterval: number | null
+  maxErrors: number | null
   headers: Record<string, string>
   outputDir: string
   overwriteOutput: boolean
@@ -57,6 +58,9 @@ export function serializeArgs(args: ParsedArgs): {
   if (args.startInterval !== null) {
     parts.push(`--start-interval ${args.startInterval}`)
   }
+  if (args.maxErrors !== null) {
+    parts.push(`--max-errors ${args.maxErrors}`)
+  }
   for (const [name, value] of Object.entries(args.headers)) {
     parts.push(`-H "${name}: ${value}"`)
   }
@@ -76,6 +80,7 @@ export function serializeArgs(args: ParsedArgs): {
     workers: args.workers,
     loadedDurationMinutes: args.loadedDurationMinutes,
     startInterval: args.startInterval,
+    maxErrors: args.maxErrors,
     headers: args.headers,
     outputDir: args.outputDir,
     overwriteOutput: args.overwriteOutput,
@@ -217,6 +222,10 @@ export function parseArgs(argv?: string[]): CliResult {
       defaultOutputDir(),
     )
     .option("--overwrite-output", "Delete output dir if it exists", false)
+    .option(
+      "--max-errors <n>",
+      "Stop the test after this many cumulative session failures (0 to disable, default: workers * 5)",
+    )
     .option("--debug-log", "Write verbose debug log", false)
     .option(
       "--log-level <level>",
@@ -239,6 +248,7 @@ export function parseArgs(argv?: string[]): CliResult {
           workers: string
           loadedDurationMinutes: string
           startInterval?: string
+          maxErrors?: string
           header?: string[]
           outputDir: string
           overwriteOutput: boolean
@@ -284,6 +294,15 @@ export function parseArgs(argv?: string[]): CliResult {
           throw new Error(`Invalid start-interval value: ${opts.startInterval}`)
         }
 
+        const maxErrors =
+          opts.maxErrors !== undefined ? Number(opts.maxErrors) : null
+        if (
+          maxErrors !== null &&
+          (!Number.isInteger(maxErrors) || maxErrors < 0)
+        ) {
+          throw new Error(`Invalid max-errors value: ${opts.maxErrors}`)
+        }
+
         const workers = Number(opts.workers)
         if (!Number.isInteger(workers) || workers < 1) {
           throw new Error(`Invalid workers value: ${opts.workers}`)
@@ -307,6 +326,7 @@ export function parseArgs(argv?: string[]): CliResult {
             workers,
             loadedDurationMinutes,
             startInterval,
+            maxErrors,
             headers,
             outputDir: opts.outputDir,
             overwriteOutput: opts.overwriteOutput,

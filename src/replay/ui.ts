@@ -15,6 +15,7 @@ export interface UIConfig {
   appUrl: string
   workers: number
   loadedDurationMinutes: number
+  maxErrors: number
   outputDir: string
 }
 
@@ -94,17 +95,26 @@ export class ReplayTerminalUI {
   }
 
   showBanner(): void {
-    const { version, appUrl, workers, loadedDurationMinutes, outputDir } =
-      this.config
+    const {
+      version,
+      appUrl,
+      workers,
+      loadedDurationMinutes,
+      maxErrors,
+      outputDir,
+    } = this.config
     const w = process.stderr.write.bind(process.stderr)
 
     w("\n")
     w(`  ${bold(cyan("shinyloadtest"))} ${dim(`v${version}`)}\n`)
     w("\n")
-    w(`  ${dim("Target:")}    ${bold(appUrl)}\n`)
-    w(`  ${dim("Workers:")}   ${bold(String(workers))}\n`)
-    w(`  ${dim("Duration:")}  ${bold(`${loadedDurationMinutes} min`)}\n`)
-    w(`  ${dim("Output:")}    ${bold(outputDir)}\n`)
+    w(`  ${dim("Target:")}      ${bold(appUrl)}\n`)
+    w(`  ${dim("Workers:")}     ${bold(String(workers))}\n`)
+    w(`  ${dim("Duration:")}    ${bold(`${loadedDurationMinutes} min`)}\n`)
+    w(
+      `  ${dim("Max errors:")}  ${bold(maxErrors > 0 ? String(maxErrors) : "unlimited")}\n`,
+    )
+    w(`  ${dim("Output:")}      ${bold(outputDir)}\n`)
     w("\n")
   }
 
@@ -177,6 +187,29 @@ export class ReplayTerminalUI {
     }
     w("\n")
     w(`  ${dim("Duration:")}  ${bold(formatDuration(totalDuration))}\n`)
+    w("\n")
+  }
+
+  finishMaxErrors(stats: StatsCounts, maxErrors: number): void {
+    this.stopUpdates()
+    this.spinner.fail(
+      red(`Max errors exceeded (${stats.failed} failures, limit ${maxErrors})`),
+    )
+
+    const totalDuration = Date.now() - this.testStartTime
+    const w = process.stderr.write.bind(process.stderr)
+
+    w("\n")
+    w(`  ${dim("Sessions:")}  ${bold(green(String(stats.done)))} completed`)
+    w(`, ${bold(red(String(stats.failed)))} failed`)
+    if (stats.canceled > 0) {
+      w(`, ${dim(String(stats.canceled))} canceled`)
+    }
+    w("\n")
+    w(`  ${dim("Duration:")}  ${bold(formatDuration(totalDuration))}\n`)
+    w(
+      `\n  ${dim("Use --max-errors to adjust the threshold, or --max-errors 0 to disable.")}\n`,
+    )
     w("\n")
   }
 
