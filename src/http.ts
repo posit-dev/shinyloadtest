@@ -20,21 +20,47 @@ export interface HttpResponse {
 // Errors
 // ---------------------------------------------------------------------------
 
+/** Human-readable reason phrases for common HTTP status codes. */
+const HTTP_STATUS_TEXT: Record<number, string> = {
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  408: "Request Timeout",
+  410: "Gone",
+  500: "Internal Server Error",
+  502: "Bad Gateway",
+  503: "Service Unavailable",
+  504: "Gateway Timeout",
+}
+
+/** Extract the <title> text from an HTML response, if present. */
+function extractHtmlTitle(html: string): string | null {
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)
+  if (!match) return null
+  const text = match[1]!.replace(/\s+/g, " ").trim()
+  return text.length > 0 ? text : null
+}
+
 /**
  * Thrown when the app URL returns a clearly-fatal HTTP status code
  * (e.g. 404, 5xx) during pre-flight validation.
  */
 export class HttpStatusError extends Error {
   readonly statusCode: number
+  readonly url: string
+  readonly statusText: string
+  readonly pageTitle: string | null
 
   constructor(statusCode: number, url: string, body: string) {
-    const preview = body.length > 200 ? body.substring(0, 200) + "..." : body
-    super(
-      `App URL returned HTTP ${statusCode}: ${url}` +
-        (preview ? `\n${preview}` : ""),
-    )
+    const statusText = HTTP_STATUS_TEXT[statusCode] ?? "Error"
+    super(`HTTP ${statusCode} (${statusText}) from ${url}`)
     this.name = "HttpStatusError"
     this.statusCode = statusCode
+    this.url = url
+    this.statusText = statusText
+    this.pageTitle = extractHtmlTitle(body)
   }
 }
 

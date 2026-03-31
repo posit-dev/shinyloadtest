@@ -1,5 +1,6 @@
 import * as path from "node:path"
 import { CookieJar } from "tough-cookie"
+import { bold, dim, red, yellow } from "yoctocolors"
 import { VERSION } from "./version.js"
 import { parseArgs, serializeArgs } from "./cli.js"
 import { record } from "./record/record.js"
@@ -169,7 +170,57 @@ async function main(): Promise<void> {
   process.exit(0)
 }
 
+function formatHttpStatusError(err: HttpStatusError): string {
+  const w = process.stderr.isTTY
+  const lines: string[] = []
+
+  lines.push("")
+  lines.push(
+    w
+      ? `  ${red("\u2716")} ${bold(red(`HTTP ${err.statusCode}`))} ${dim(`\u2014 ${err.statusText}`)}`
+      : `  x HTTP ${err.statusCode} -- ${err.statusText}`,
+  )
+  lines.push("")
+  lines.push(w ? `  ${dim("URL:")}  ${bold(err.url)}` : `  URL:  ${err.url}`)
+
+  if (err.pageTitle) {
+    lines.push(
+      w ? `  ${dim("Page:")} ${err.pageTitle}` : `  Page: ${err.pageTitle}`,
+    )
+  }
+
+  lines.push("")
+
+  const hint = httpStatusHint(err.statusCode)
+  if (hint) {
+    lines.push(w ? `  ${yellow(hint)}` : `  ${hint}`)
+    lines.push("")
+  }
+
+  return lines.join("\n")
+}
+
+function httpStatusHint(status: number): string {
+  if (status === 401 || status === 403) {
+    return (
+      "The app may require authentication. Set SHINYLOADTEST_CONNECT_API_KEY\n" +
+      "  or SHINYLOADTEST_USER / SHINYLOADTEST_PASS environment variables."
+    )
+  }
+  if (status === 404) {
+    return "Verify the URL is correct and the application is deployed."
+  }
+  if (status >= 500) {
+    return "The server returned an error. Check that the application is running."
+  }
+  return ""
+}
+
 main().catch((err: unknown) => {
+  if (err instanceof HttpStatusError) {
+    process.stderr.write(formatHttpStatusError(err))
+    process.exit(1)
+  }
   const message = err instanceof Error ? err.message : String(err)
   console.error(`Error: ${message}`)
   process.exit(1)
