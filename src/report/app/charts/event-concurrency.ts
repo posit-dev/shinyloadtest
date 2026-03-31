@@ -180,14 +180,17 @@ export function renderEventConcurrency(state: AppState): void {
           }),
         )
       }
-      marks.push(
-        Plot.linearRegressionY(eventData, {
-          x: "concurrency",
-          y: "time",
-          stroke: "#999",
-          strokeWidth: 1.5,
-        }),
-      )
+      const uniqueX = new Set(eventData.map((d) => d.concurrency))
+      if (uniqueX.size > 1) {
+        marks.push(
+          Plot.linearRegressionY(eventData, {
+            x: "concurrency",
+            y: "time",
+            stroke: "#999",
+            strokeWidth: 1.5,
+          }),
+        )
+      }
 
       const chart = Plot.plot({
         height: 160,
