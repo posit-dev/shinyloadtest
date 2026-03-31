@@ -9,7 +9,7 @@ import { createLogger } from "./logger.js"
 import { createOutputDir } from "./replay/output.js"
 import { runEnduranceTest } from "./replay/worker.js"
 import { SERVER_TYPE_NAMES, ServerType } from "./types.js"
-import { HttpClient } from "./http.js"
+import { HttpClient, HttpStatusError } from "./http.js"
 import { detectServerType } from "./detect.js"
 import { ReplayTerminalUI } from "./replay/ui.js"
 
@@ -87,7 +87,10 @@ async function main(): Promise<void> {
           `target type (${recordingServerTypeName}). Playback may not work correctly.`,
       )
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof HttpStatusError) {
+      throw err
+    }
     logger.warn(
       "Could not detect server type; skipping server type validation.",
     )

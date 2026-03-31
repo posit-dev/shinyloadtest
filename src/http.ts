@@ -17,6 +17,28 @@ export interface HttpResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when the app URL returns a clearly-fatal HTTP status code
+ * (e.g. 404, 5xx) during pre-flight validation.
+ */
+export class HttpStatusError extends Error {
+  readonly statusCode: number
+
+  constructor(statusCode: number, url: string, body: string) {
+    const preview = body.length > 200 ? body.substring(0, 200) + "..." : body
+    super(
+      `App URL returned HTTP ${statusCode}: ${url}` +
+        (preview ? `\n${preview}` : ""),
+    )
+    this.name = "HttpStatusError"
+    this.statusCode = statusCode
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 

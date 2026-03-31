@@ -7,6 +7,7 @@
 
 import { ServerType } from "./types.js"
 import type { HttpClient } from "./http.js"
+import { HttpStatusError } from "./http.js"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,6 +49,11 @@ export async function detectServerType(
 
   // Step 2: fetch the app
   const resp = await httpClient.get(appUrl)
+
+  // Step 2b: check for fatal HTTP status codes
+  if (resp.statusCode >= 400) {
+    throw new HttpStatusError(resp.statusCode, appUrl, resp.body)
+  }
 
   // Step 3a: SSP via x-ssp-xsrf header
   if (resp.headers["x-ssp-xsrf"] !== undefined) {
