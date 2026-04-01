@@ -467,7 +467,7 @@ li.nav-group-label {
   position: fixed;
   pointer-events: none;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 6px 10px;

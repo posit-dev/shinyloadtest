@@ -20,6 +20,7 @@ export function navigateToSection(
   document.querySelectorAll(".nav-link").forEach((l) => {
     l.classList.remove("active")
     l.setAttribute("aria-selected", "false")
+    l.setAttribute("tabindex", "-1")
   })
   const link = document.querySelector(
     '.nav-link[data-section="' + sectionId + '"]',
@@ -27,6 +28,7 @@ export function navigateToSection(
   if (link) {
     link.classList.add("active")
     link.setAttribute("aria-selected", "true")
+    link.setAttribute("tabindex", "0")
   }
   document
     .querySelectorAll(".section")
@@ -49,15 +51,60 @@ export function navigateToSubTab(
   sectionEl.querySelectorAll(".sub-tab").forEach((t) => {
     t.classList.remove("active")
     t.setAttribute("aria-selected", "false")
+    ;(t as HTMLElement).tabIndex = -1
   })
   tab.classList.add("active")
   tab.setAttribute("aria-selected", "true")
+  ;(tab as HTMLElement).tabIndex = 0
   sectionEl
     .querySelectorAll(".sub-content")
     .forEach((c) => c.classList.remove("active"))
   const content = document.getElementById(tabId)
   if (content) content.classList.add("active")
   if (pushState !== false) updateUrlState({ tab: tabId })
+}
+
+function setupTablistKeyboard(
+  tablistEl: Element,
+  tabSelector: string,
+  onActivate: (tab: HTMLElement) => void,
+  vertical = false,
+): void {
+  tablistEl.addEventListener("keydown", (e) => {
+    const event = e as KeyboardEvent
+    const tabs = [
+      ...tablistEl.querySelectorAll<HTMLElement>(tabSelector),
+    ].filter((t) => t.style.display !== "none")
+    const current = tabs.indexOf(event.target as HTMLElement)
+    if (current < 0) return
+
+    const prev = vertical ? "ArrowUp" : "ArrowLeft"
+    const next = vertical ? "ArrowDown" : "ArrowRight"
+    let target: HTMLElement | null = null
+
+    switch (event.key) {
+      case next:
+        target = tabs[(current + 1) % tabs.length]
+        break
+      case prev:
+        target = tabs[(current - 1 + tabs.length) % tabs.length]
+        break
+      case "Home":
+        target = tabs[0]
+        break
+      case "End":
+        target = tabs[tabs.length - 1]
+        break
+      default:
+        return
+    }
+
+    if (target) {
+      event.preventDefault()
+      target.focus()
+      onActivate(target)
+    }
+  })
 }
 
 export function setupNavigation(): void {
@@ -87,7 +134,12 @@ export function setupNavigation(): void {
   })
   sidebarOverlay.addEventListener("click", closeSidebar)
 
+  // Set initial tabindex: active tab is 0, others are -1
   document.querySelectorAll(".nav-link").forEach((link) => {
+    link.setAttribute(
+      "tabindex",
+      link.classList.contains("active") ? "0" : "-1",
+    )
     link.addEventListener("click", (e) => {
       e.preventDefault()
       navigateToSection((link as HTMLElement).dataset.section ?? "")
@@ -95,14 +147,34 @@ export function setupNavigation(): void {
     })
   })
 
+  const navList = document.querySelector(".nav-list")!
+  setupTablistKeyboard(
+    navList,
+    ".nav-link",
+    (tab) => {
+      navigateToSection(tab.dataset.section ?? "")
+      closeSidebar()
+    },
+    true,
+  )
+
   document.querySelectorAll(".sub-tabs").forEach((tabGroup) => {
+    // Set initial tabindex for sub-tabs
     tabGroup.querySelectorAll(".sub-tab").forEach((tab) => {
+      ;(tab as HTMLElement).tabIndex = tab.classList.contains("active") ? 0 : -1
       tab.addEventListener("click", () => {
         navigateToSubTab(
           tab.closest(".section") as HTMLElement,
           (tab as HTMLElement).dataset.subtab ?? "",
         )
       })
+    })
+
+    setupTablistKeyboard(tabGroup, ".sub-tab", (tab) => {
+      navigateToSubTab(
+        tab.closest(".section") as HTMLElement,
+        tab.dataset.subtab ?? "",
+      )
     })
   })
 }

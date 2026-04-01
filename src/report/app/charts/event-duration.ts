@@ -162,6 +162,11 @@ export function renderEventDuration(state: AppState): void {
           ],
         })
       }
+      chart.setAttribute("role", "img")
+      chart.setAttribute(
+        "aria-label",
+        "Duration box plot for " + stat.label,
+      )
       item.appendChild(chart)
     }
   }
@@ -200,5 +205,6 @@ export function renderEventDuration(state: AppState): void {
     stats as unknown as Record<string, unknown>[],
     "max_time",
     false,
+    "Event duration statistics",
   )
 }

@@ -174,6 +174,7 @@ export function makeSortableTable(
   rows: Record<string, unknown>[],
   defaultSortCol: string,
   defaultSortAsc: boolean,
+  caption?: string,
 ): void {
   if (!el) return
   const container = el
@@ -199,6 +200,12 @@ export function makeSortableTable(
 
     const table = document.createElement("table")
     table.className = "data-table"
+    if (caption) {
+      const cap = document.createElement("caption")
+      cap.className = "visually-hidden"
+      cap.textContent = caption
+      table.appendChild(cap)
+    }
     const thead = document.createElement("thead")
     const headRow = document.createElement("tr")
     columns.forEach((col) => {

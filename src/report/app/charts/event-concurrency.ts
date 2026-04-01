@@ -201,6 +201,11 @@ export function renderEventConcurrency(state: AppState): void {
         y: { label: "Time (sec)", grid: true },
         marks,
       })
+      chart.setAttribute("role", "img")
+      chart.setAttribute(
+        "aria-label",
+        "Concurrency scatter plot for " + stat.label,
+      )
       item.appendChild(chart)
     }
   }
@@ -238,5 +243,6 @@ export function renderEventConcurrency(state: AppState): void {
     stats as unknown as Record<string, unknown>[],
     "slope",
     false,
+    "Event concurrency regression statistics",
   )
 }
