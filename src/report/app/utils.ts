@@ -154,7 +154,10 @@ export function makeGridPicker(
     const n = Number(input.value)
     return Math.max(1, Math.min(totalEvents, Number.isFinite(n) ? n : count))
   }
-  input.addEventListener("input", () => onChangeCallback(clamp()))
+  input.addEventListener("input", () => {
+    onChangeCallback(clamp())
+    input.focus()
+  })
   return { picker, getCount: clamp }
 }
 
