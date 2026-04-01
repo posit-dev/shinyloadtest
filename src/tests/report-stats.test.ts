@@ -943,6 +943,7 @@ describe("computeReportStats", () => {
         },
       ],
       recording: makeRecording(),
+      skipped: [],
     }
     const result = computeReportStats(data)
     expect(result.runs).toHaveLength(1)
@@ -978,6 +979,7 @@ describe("computeReportStats", () => {
     const data: ReportData = {
       runs: [makeRun("run1", 200), makeRun("run2", 600)],
       recording: makeRecording(),
+      skipped: [],
     }
     const result = computeReportStats(data)
     expect(result.aggregate.eventDurations).toHaveLength(1)

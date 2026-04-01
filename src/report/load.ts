@@ -31,6 +31,7 @@ export interface ReportData {
     events: RecordingEventInfo[]
     duration: number
   }
+  skipped: string[]
 }
 
 function readSessionCSV(filePath: string): SessionRow[] {
@@ -397,6 +398,12 @@ function readRecordingForReport(filePath: string): {
   return { events, duration }
 }
 
+function dirHasCSVFiles(dir: string): boolean {
+  const sessionsDir = path.join(dir, "sessions")
+  if (!fs.existsSync(sessionsDir)) return false
+  return fs.readdirSync(sessionsDir).some((f) => f.endsWith(".csv"))
+}
+
 export function findOutputDirs(searchDir: string): string[] {
   if (!fs.existsSync(searchDir)) return []
 
@@ -413,39 +420,48 @@ export function loadReportData(outputDirs: string[]): ReportData {
     throw new Error("No output directories provided")
   }
 
-  const runs = outputDirs.map((dir) => {
-    const sessionsDir = path.join(dir, "sessions")
-    if (!fs.existsSync(sessionsDir)) {
-      throw new Error(`Sessions directory not found: ${sessionsDir}`)
-    }
+  const skipped: string[] = []
 
-    const csvFiles = fs
-      .readdirSync(sessionsDir)
-      .filter((f) => f.endsWith(".csv"))
-      .map((f) => path.join(sessionsDir, f))
+  const runs = outputDirs
+    .map((dir) => {
+      if (!dirHasCSVFiles(dir)) {
+        skipped.push(dir)
+        return null
+      }
 
-    if (csvFiles.length === 0) {
-      throw new Error(`No CSV files found in: ${sessionsDir}`)
-    }
+      const sessionsDir = path.join(dir, "sessions")
+      const csvFiles = fs
+        .readdirSync(sessionsDir)
+        .filter((f) => f.endsWith(".csv"))
+        .map((f) => path.join(sessionsDir, f))
 
-    const allRows: SessionRow[] = []
-    for (const file of csvFiles) {
-      allRows.push(...readSessionCSV(file))
-    }
-    allRows.sort((a, b) => a.timestamp - b.timestamp)
+      const allRows: SessionRow[] = []
+      for (const file of csvFiles) {
+        allRows.push(...readSessionCSV(file))
+      }
+      allRows.sort((a, b) => a.timestamp - b.timestamp)
 
-    return {
-      name: path.basename(dir),
-      rows: allRows,
-    }
-  })
+      return {
+        name: path.basename(dir),
+        rows: allRows,
+      }
+    })
+    .filter((run) => run !== null)
 
-  // Load recording from first directory (all runs should use same recording)
-  const recordingPath = path.join(outputDirs[0]!, "recording.log")
+  if (runs.length === 0) {
+    throw new Error(
+      "No session data found. All output directories were empty " +
+        "(replays may have been terminated before completing any sessions).",
+    )
+  }
+
+  // Load recording from first valid directory (all runs should use same recording)
+  const validDirs = outputDirs.filter((d) => !skipped.includes(d))
+  const recordingPath = path.join(validDirs[0]!, "recording.log")
   if (!fs.existsSync(recordingPath)) {
     throw new Error(`Recording file not found: ${recordingPath}`)
   }
   const recording = readRecordingForReport(recordingPath)
 
-  return { runs, recording }
+  return { runs, recording, skipped }
 }

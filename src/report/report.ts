@@ -2,7 +2,7 @@ import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import * as http from "node:http"
 import * as path from "node:path"
-import { bold, cyan, dim, green } from "yoctocolors"
+import { bold, cyan, dim, green, yellow } from "yoctocolors"
 import { findOutputDirs, loadReportData } from "./load.js"
 import { generateReportJSON } from "./format-json.js"
 import { generateReportText } from "./format-text.js"
@@ -40,6 +40,15 @@ export async function report(options: ReportOptions): Promise<void> {
 
   const data = loadReportData(dirs)
 
+  if (data.skipped.length > 0) {
+    w("\n")
+    for (const dir of data.skipped) {
+      w(
+        `  ${yellow("⚠")} Skipping ${bold(path.basename(dir))}: no session data (replay may have been terminated early)\n`,
+      )
+    }
+  }
+
   if (options.format === "text" || options.format === "json") {
     const output =
       options.format === "json"
@@ -62,9 +71,10 @@ export async function report(options: ReportOptions): Promise<void> {
   w(`  ${bold(cyan("shinyloadtest report"))}\n`)
   w("\n")
 
-  const nRuns = dirs.length
+  const validDirs = dirs.filter((d) => !data.skipped.includes(d))
+  const nRuns = validDirs.length
   w(`  ${dim("Runs:")} ${bold(String(nRuns))}\n`)
-  for (const dir of dirs) {
+  for (const dir of validDirs) {
     w(`    ${dim("•")} ${path.basename(dir)}\n`)
   }
   w("\n")
