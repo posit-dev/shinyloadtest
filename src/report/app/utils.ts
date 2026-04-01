@@ -75,7 +75,7 @@ document.body.appendChild(tooltip)
 
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 
-function showTooltip(parent: Element, text: string, e?: MouseEvent): void {
+function showTooltip(parent: Element, text: string, e: MouseEvent): void {
   if (hideTimer) {
     clearTimeout(hideTimer)
     hideTimer = null
@@ -83,19 +83,14 @@ function showTooltip(parent: Element, text: string, e?: MouseEvent): void {
   tooltip.textContent = text
   tooltip.style.opacity = "1"
   const rect = parent.getBoundingClientRect()
-  if (e) {
-    tooltip.style.left =
-      Math.max(
-        8,
-        Math.min(
-          e.clientX + 12,
-          window.innerWidth - tooltip.offsetWidth - 8,
-        ),
-      ) + "px"
-  } else {
-    tooltip.style.left =
-      Math.max(8, rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + "px"
-  }
+  tooltip.style.left =
+    Math.max(
+      8,
+      Math.min(
+        e.clientX + 12,
+        window.innerWidth - tooltip.offsetWidth - 8,
+      ),
+    ) + "px"
   tooltip.style.top = rect.top - tooltip.offsetHeight - 6 + "px"
   if (parseFloat(tooltip.style.top) < 0) {
     tooltip.style.top = rect.bottom + 6 + "px"
@@ -117,7 +112,6 @@ export function enableTooltips(chartEl: HTMLElement): void {
     titleEl.remove()
     parent.setAttribute("role", "img")
     parent.setAttribute("aria-label", text)
-    parent.setAttribute("tabindex", "0")
     parent.addEventListener("mouseenter", (e) => {
       showTooltip(parent, text, e as MouseEvent)
     })
@@ -132,10 +126,6 @@ export function enableTooltips(chartEl: HTMLElement): void {
         ) + "px"
     })
     parent.addEventListener("mouseleave", hideTooltip)
-    parent.addEventListener("focus", () => {
-      showTooltip(parent, text)
-    })
-    parent.addEventListener("blur", hideTooltip)
   }
 }
 
