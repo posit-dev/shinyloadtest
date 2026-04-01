@@ -151,9 +151,12 @@ function serveReport(html: string, open: boolean): Promise<void> {
     let isShuttingDown = false
 
     function shutdown(): void {
-      if (isShuttingDown) return
+      if (isShuttingDown) {
+        process.exit(130)
+      }
       isShuttingDown = true
-      w(`\n  ${dim("Stopping server.")}\n\n`)
+      w(`\n  ${dim("Stopping server.")}\n`)
+      w(`  ${dim("Press Ctrl+C again to force quit.")}\n\n`)
       server.close(() => {
         process.off("SIGINT", shutdown)
         process.off("SIGTERM", shutdown)
