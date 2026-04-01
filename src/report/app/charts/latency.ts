@@ -128,6 +128,11 @@ function renderLatencyFaceted(
       marks,
     })
 
+    chart.setAttribute("role", "img")
+    chart.setAttribute(
+      "aria-label",
+      eventLabels.join(" and ") + " latency chart for " + run.name,
+    )
     card.appendChild(chart)
     enableTooltips(chart as unknown as HTMLElement)
   }

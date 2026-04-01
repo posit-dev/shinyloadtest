@@ -107,5 +107,10 @@ export function renderWaterfall(state: AppState): void {
     marks,
   })
 
+  chart.setAttribute("role", "img")
+  chart.setAttribute(
+    "aria-label",
+    "Event waterfall chart showing session progress across recording events",
+  )
   el.appendChild(chart)
 }

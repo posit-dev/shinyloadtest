@@ -81,6 +81,15 @@ export function renderSessions(state: AppState): void {
   })
 
   el.appendChild(eventLegend())
+  chart.setAttribute("role", "img")
+  chart.setAttribute(
+    "aria-label",
+    "Sessions Gantt chart showing " +
+      nWorkers +
+      " simulated user" +
+      (nWorkers !== 1 ? "s" : "") +
+      " executing back-to-back sessions",
+  )
   el.appendChild(chart)
   enableTooltips(el)
 }

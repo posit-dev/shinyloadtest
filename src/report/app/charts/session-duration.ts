@@ -92,6 +92,15 @@ export function renderSessionDuration(state: AppState): void {
   })
 
   el.appendChild(eventLegend())
+  chart.setAttribute("role", "img")
+  chart.setAttribute(
+    "aria-label",
+    "Session duration chart showing " +
+      nSess +
+      " maintenance session" +
+      (nSess !== 1 ? "s" : "") +
+      " ordered by total duration",
+  )
   el.appendChild(chart)
   enableTooltips(el)
 }

@@ -15,16 +15,24 @@
     </script>
   </head>
   <body>
+    <a
+      href="#main-content"
+      class="visually-hidden focusable"
+      >Skip to main content</a
+    >
     <div class="layout">
       <button
         class="mobile-menu-toggle"
         id="menu-toggle"
         aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar"
       >
         <svg
           width="16"
           height="16"
           viewBox="0 0 20 20"
+          aria-hidden="true"
         >
           <rect
             y="3"
@@ -53,11 +61,22 @@
       <nav
         class="sidebar"
         id="sidebar"
+        aria-label="Report sections"
       >
         <h1 class="sidebar-title">shinyloadtest</h1>
-        <ul class="nav-list">
-          <li class="nav-group-label">Per Run</li>
-          <li>
+        <ul
+          class="nav-list"
+          role="tablist"
+          aria-label="Report sections"
+          aria-orientation="vertical"
+        >
+          <li
+            class="nav-group-label"
+            role="presentation"
+          >
+            Per Run
+          </li>
+          <li role="presentation">
             <div
               class="sidebar-run-select"
               id="sidebar-run-select"
@@ -68,11 +87,15 @@
               ></select>
             </div>
           </li>
-          <li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link active"
               data-section="sessions"
+              role="tab"
+              aria-selected="true"
+              aria-controls="sessions"
+              id="tab-sessions"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -81,6 +104,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <rect
                   width="20"
@@ -113,11 +137,15 @@
               >Sessions</a
             >
           </li>
-          <li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link"
               data-section="session-duration"
+              role="tab"
+              aria-selected="false"
+              aria-controls="session-duration"
+              id="tab-session-duration"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -126,6 +154,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <path d="M2 7v10" />
                 <path d="M6 5v14" />
@@ -139,11 +168,15 @@
               >Session Duration</a
             >
           </li>
-          <li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link"
               data-section="waterfall"
+              role="tab"
+              aria-selected="false"
+              aria-controls="waterfall"
+              id="tab-waterfall"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -152,6 +185,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <rect
                   width="18"
@@ -165,12 +199,21 @@
               >Event Waterfall</a
             >
           </li>
-          <li class="nav-group-label">All Runs</li>
-          <li>
+          <li
+            class="nav-group-label"
+            role="presentation"
+          >
+            All Runs
+          </li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link"
               data-section="latency"
+              role="tab"
+              aria-selected="false"
+              aria-controls="latency"
+              id="tab-latency"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -179,6 +222,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <circle
                   cx="12"
@@ -189,11 +233,15 @@
               >Latency</a
             >
           </li>
-          <li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link"
               data-section="event-duration"
+              role="tab"
+              aria-selected="false"
+              aria-controls="event-duration"
+              id="tab-event-duration"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -202,6 +250,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <line
                   x1="10"
@@ -223,11 +272,15 @@
               >Event Duration</a
             >
           </li>
-          <li>
+          <li role="presentation">
             <a
               href="#"
               class="nav-link"
               data-section="event-concurrency"
+              role="tab"
+              aria-selected="false"
+              aria-controls="event-concurrency"
+              id="tab-event-concurrency"
               ><svg
                 class="nav-icon"
                 viewBox="0 0 24 24"
@@ -236,6 +289,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
                 <circle
                   cx="12"
@@ -259,11 +313,17 @@
           </li>
         </ul>
       </nav>
-      <main class="content">
+      <main
+        class="content"
+        id="main-content"
+      >
         <section
           id="sessions"
           class="section active"
+          role="tabpanel"
+          aria-labelledby="tab-sessions"
         >
+          <h2 class="visually-hidden">Sessions</h2>
           <div class="section-desc">
             <p id="sessions-desc">
               Simulated users executing back-to-back sessions. Warmup or
@@ -279,7 +339,10 @@
         <section
           id="session-duration"
           class="section"
+          role="tabpanel"
+          aria-labelledby="tab-session-duration"
         >
+          <h2 class="visually-hidden">Session Duration</h2>
           <div class="section-desc">
             <p id="session-duration-desc">
               Maintenance sessions ordered from fastest to slowest completion
@@ -296,7 +359,10 @@
         <section
           id="waterfall"
           class="section"
+          role="tabpanel"
+          aria-labelledby="tab-waterfall"
         >
+          <h2 class="visually-hidden">Event Waterfall</h2>
           <div class="section-desc">
             <p>
               Each session is represented with a line that cascades downward
@@ -314,18 +380,33 @@
         <section
           id="latency"
           class="section"
+          role="tabpanel"
+          aria-labelledby="tab-latency"
         >
+          <h2 class="visually-hidden">Latency</h2>
           <div class="section-desc">
-            <div class="sub-tabs">
+            <div
+              class="sub-tabs"
+              role="tablist"
+              aria-label="Latency views"
+            >
               <button
                 class="sub-tab active"
                 data-subtab="http-latency"
+                role="tab"
+                aria-selected="true"
+                aria-controls="http-latency"
+                id="subtab-http-latency"
               >
                 Total HTTP
               </button>
               <button
                 class="sub-tab"
                 data-subtab="ws-latency"
+                role="tab"
+                aria-selected="false"
+                aria-controls="ws-latency"
+                id="subtab-ws-latency"
               >
                 Maximum WebSocket
               </button>
@@ -334,6 +415,8 @@
           <div
             id="http-latency"
             class="chart-area sub-content active"
+            role="tabpanel"
+            aria-labelledby="subtab-http-latency"
           >
             <p class="chart-desc">
               Total HTTP and supporting files (JS/CSS) latency (load time) is
@@ -348,6 +431,8 @@
           <div
             id="ws-latency"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-ws-latency"
           >
             <p class="chart-desc">
               Maximum WebSocket latency (calculation time) is displayed for each
@@ -362,18 +447,33 @@
         <section
           id="event-duration"
           class="section"
+          role="tabpanel"
+          aria-labelledby="tab-event-duration"
         >
+          <h2 class="visually-hidden">Event Duration</h2>
           <div class="section-desc">
-            <div class="sub-tabs">
+            <div
+              class="sub-tabs"
+              role="tablist"
+              aria-label="Event duration views"
+            >
               <button
                 class="sub-tab active"
                 data-subtab="dur-max"
+                role="tab"
+                aria-selected="true"
+                aria-controls="dur-max"
+                id="subtab-dur-max"
               >
                 Slowest max
               </button>
               <button
                 class="sub-tab"
                 data-subtab="dur-min"
+                role="tab"
+                aria-selected="false"
+                aria-controls="dur-min"
+                id="subtab-dur-min"
               >
                 Slowest min
               </button>
@@ -382,12 +482,19 @@
                 data-subtab="dur-mean-diff"
                 id="dur-mean-diff-tab"
                 style="display: none"
+                role="tab"
+                aria-selected="false"
+                aria-controls="dur-mean-diff"
               >
                 Largest mean difference
               </button>
               <button
                 class="sub-tab"
                 data-subtab="dur-table"
+                role="tab"
+                aria-selected="false"
+                aria-controls="dur-table"
+                id="subtab-dur-table"
               >
                 Data table
               </button>
@@ -396,6 +503,8 @@
           <div
             id="dur-max"
             class="chart-area sub-content active"
+            role="tabpanel"
+            aria-labelledby="subtab-dur-max"
           >
             <p class="chart-desc">
               Event plots are arranged by the slowest
@@ -406,6 +515,8 @@
           <div
             id="dur-min"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-dur-min"
           >
             <p class="chart-desc">
               Event plots are arranged by the slowest
@@ -416,6 +527,8 @@
           <div
             id="dur-mean-diff"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="dur-mean-diff-tab"
           >
             <p class="chart-desc">
               Event plots are arranged by the largest
@@ -426,6 +539,8 @@
           <div
             id="dur-table"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-dur-table"
           >
             <div id="dur-table-content"></div>
           </div>
@@ -433,30 +548,53 @@
         <section
           id="event-concurrency"
           class="section"
+          role="tabpanel"
+          aria-labelledby="tab-event-concurrency"
         >
+          <h2 class="visually-hidden">Event Concurrency</h2>
           <div class="section-desc">
-            <div class="sub-tabs">
+            <div
+              class="sub-tabs"
+              role="tablist"
+              aria-label="Event concurrency views"
+            >
               <button
                 class="sub-tab active"
                 data-subtab="conc-slope"
+                role="tab"
+                aria-selected="true"
+                aria-controls="conc-slope"
+                id="subtab-conc-slope"
               >
                 Largest slope
               </button>
               <button
                 class="sub-tab"
                 data-subtab="conc-intercept"
+                role="tab"
+                aria-selected="false"
+                aria-controls="conc-intercept"
+                id="subtab-conc-intercept"
               >
                 Largest intercept
               </button>
               <button
                 class="sub-tab"
                 data-subtab="conc-error"
+                role="tab"
+                aria-selected="false"
+                aria-controls="conc-error"
+                id="subtab-conc-error"
               >
                 Largest error
               </button>
               <button
                 class="sub-tab"
                 data-subtab="conc-table"
+                role="tab"
+                aria-selected="false"
+                aria-controls="conc-table"
+                id="subtab-conc-table"
               >
                 Data table
               </button>
@@ -465,6 +603,8 @@
           <div
             id="conc-slope"
             class="chart-area sub-content active"
+            role="tabpanel"
+            aria-labelledby="subtab-conc-slope"
           >
             <p class="chart-desc">
               Event plots are arranged by the largest
@@ -476,6 +616,8 @@
           <div
             id="conc-intercept"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-conc-intercept"
           >
             <p class="chart-desc">
               Event plots are arranged by the largest
@@ -487,6 +629,8 @@
           <div
             id="conc-error"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-conc-error"
           >
             <p class="chart-desc">
               Event plots are arranged by the largest
@@ -498,6 +642,8 @@
           <div
             id="conc-table"
             class="chart-area sub-content"
+            role="tabpanel"
+            aria-labelledby="subtab-conc-table"
           >
             <div id="conc-table-content"></div>
           </div>

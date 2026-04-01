@@ -17,13 +17,17 @@ export function navigateToSection(
   pushState?: boolean,
 ): void {
   if (!VALID_SECTIONS.has(sectionId)) return
-  document
-    .querySelectorAll(".nav-link")
-    .forEach((l) => l.classList.remove("active"))
+  document.querySelectorAll(".nav-link").forEach((l) => {
+    l.classList.remove("active")
+    l.setAttribute("aria-selected", "false")
+  })
   const link = document.querySelector(
     '.nav-link[data-section="' + sectionId + '"]',
   )
-  if (link) link.classList.add("active")
+  if (link) {
+    link.classList.add("active")
+    link.setAttribute("aria-selected", "true")
+  }
   document
     .querySelectorAll(".section")
     .forEach((s) => s.classList.remove("active"))
@@ -42,10 +46,12 @@ export function navigateToSubTab(
     '.sub-tab[data-subtab="' + CSS.escape(tabId) + '"]',
   )
   if (!tab) return
-  sectionEl
-    .querySelectorAll(".sub-tab")
-    .forEach((t) => t.classList.remove("active"))
+  sectionEl.querySelectorAll(".sub-tab").forEach((t) => {
+    t.classList.remove("active")
+    t.setAttribute("aria-selected", "false")
+  })
   tab.classList.add("active")
+  tab.setAttribute("aria-selected", "true")
   sectionEl
     .querySelectorAll(".sub-content")
     .forEach((c) => c.classList.remove("active"))
@@ -63,11 +69,13 @@ export function setupNavigation(): void {
     sidebar.classList.add("open")
     sidebarOverlay.classList.add("visible")
     menuToggle.classList.add("hidden")
+    menuToggle.setAttribute("aria-expanded", "true")
   }
   function closeSidebar() {
     sidebar.classList.remove("open")
     sidebarOverlay.classList.remove("visible")
     menuToggle.classList.remove("hidden")
+    menuToggle.setAttribute("aria-expanded", "false")
   }
 
   menuToggle.addEventListener("click", () => {
