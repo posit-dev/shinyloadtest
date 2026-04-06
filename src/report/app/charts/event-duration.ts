@@ -163,10 +163,7 @@ export function renderEventDuration(state: AppState): void {
         })
       }
       chart.setAttribute("role", "img")
-      chart.setAttribute(
-        "aria-label",
-        "Duration box plot for " + stat.label,
-      )
+      chart.setAttribute("aria-label", "Duration box plot for " + stat.label)
       item.appendChild(chart)
     }
   }

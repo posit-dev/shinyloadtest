@@ -86,10 +86,7 @@ function showTooltip(parent: Element, text: string, e: MouseEvent): void {
   tooltip.style.left =
     Math.max(
       8,
-      Math.min(
-        e.clientX + 12,
-        window.innerWidth - tooltip.offsetWidth - 8,
-      ),
+      Math.min(e.clientX + 12, window.innerWidth - tooltip.offsetWidth - 8),
     ) + "px"
   tooltip.style.top = rect.top - tooltip.offsetHeight - 6 + "px"
   if (parseFloat(tooltip.style.top) < 0) {
