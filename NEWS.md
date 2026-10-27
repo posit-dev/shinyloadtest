@@ -16,6 +16,11 @@ published as `shinyloadtest` on npm.
   and `SHINYLOADTEST_CONNECT_API_KEY`. The legacy `SHINYCANNON_*` names are
   still accepted as fallbacks.
 
+* Fixed API-key authentication when recording or replaying login-protected
+  Posit Connect apps. Keys set through `SHINYLOADTEST_CONNECT_API_KEY` or the
+  legacy `SHINYCANNON_CONNECT_API_KEY` are now sent with the initial app
+  requests (#7).
+
 * Added `shinyloadtest report` to generate performance reports from load test
   results. Supports HTML (interactive dashboard), text (Markdown tables), and
   JSON output formats. The HTML report is self-contained and includes charts
