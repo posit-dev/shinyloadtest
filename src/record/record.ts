@@ -44,11 +44,16 @@ export async function record(options: RecordOptions): Promise<void> {
     throw new Error(`Target URL must use http or https: ${targetUrl}`)
   }
 
+  const creds = getCreds()
+  const authHeaders =
+    creds.connectApiKey !== null ? connectApiKeyHeader(creds.connectApiKey) : {}
+  const rscApiKeyRequired = creds.connectApiKey !== null
+
   // Set up HTTP client for detection and auth
   const cookieJar = new CookieJar()
   const httpClient = new HttpClient({
     cookieJar,
-    headers: {},
+    headers: authHeaders,
     userAgent: `shinyloadtest/${VERSION}`,
   })
 
@@ -76,14 +81,8 @@ export async function record(options: RecordOptions): Promise<void> {
     }
 
     // Authentication
-    const creds = getCreds()
-    let authHeaders: Record<string, string> = {}
-    let rscApiKeyRequired = false
-
     if (creds.connectApiKey !== null) {
       ui?.startAuthenticating("Connect API key")
-      authHeaders = connectApiKeyHeader(creds.connectApiKey)
-      rscApiKeyRequired = true
       ui?.authenticated("Posit Connect")
       if (!ui) console.error("Logged in to Posit Connect")
     } else if (await isProtected(httpClient, targetUrl)) {
