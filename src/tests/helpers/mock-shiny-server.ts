@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from "ws"
 export interface MockShinyServerOptions {
   /** Delay in ms before responding to HTTP requests (default: 0) */
   httpDelay?: number
+  /** If set, run in protected (Posit Connect) mode requiring this API key */
+  connectApiKey?: string
   /** Delay in ms before sending WS init message (default: 0) */
   wsInitDelay?: number
   /** If set, return this status for GET / instead of 200 */
@@ -29,10 +31,19 @@ export class MockShinyServer {
   private httpConnections: Set<import("node:net").Socket> = new Set()
   private options: MockShinyServerOptions
 
+  readonly httpRequests: http.IncomingHttpHeaders[] = []
+  readonly wsRequests: http.IncomingHttpHeaders[] = []
+
   constructor(options: MockShinyServerOptions = {}) {
     this.options = options
     this.server = http.createServer(this.handleHttp.bind(this))
-    this.wss = new WebSocketServer({ server: this.server })
+    this.wss = new WebSocketServer({
+      server: this.server,
+      verifyClient: (info: { req: http.IncomingMessage }) => {
+        this.wsRequests.push({ ...info.req.headers })
+        return this.isAuthorized(info.req.headers)
+      },
+    })
     this.wss.on("connection", this.handleWs.bind(this))
 
     this.server.on("connection", (socket) => {
@@ -91,8 +102,14 @@ export class MockShinyServer {
     const headers = [
       "# version: 1",
       `# target_url: ${this.url}`,
-      "# target_type: R/Shiny",
+      this.options.connectApiKey !== undefined
+        ? "# target_type: RStudio Server Connect"
+        : "# target_type: R/Shiny",
     ]
+
+    if (this.options.connectApiKey !== undefined) {
+      headers.push("# rscApiKeyRequired: true")
+    }
 
     const events = [
       JSON.stringify({ type: "REQ_HOME", begin: T0, url: "/", status: 200 }),
@@ -134,18 +151,39 @@ export class MockShinyServer {
     return [...headers, ...events].join("\n")
   }
 
+  private isAuthorized(headers: http.IncomingHttpHeaders): boolean {
+    return (
+      this.options.connectApiKey === undefined ||
+      headers.authorization === `Key ${this.options.connectApiKey}`
+    )
+  }
+
   private handleHttp(
     req: http.IncomingMessage,
     res: http.ServerResponse,
   ): void {
+    this.httpRequests.push({ ...req.headers })
+
     const delay = this.options.httpDelay ?? 0
 
     const respond = (): void => {
       const url = req.url ?? "/"
 
+      if (!this.isAuthorized(req.headers)) {
+        res.writeHead(401, { "Content-Type": "text/plain" })
+        res.end("Unauthorized")
+        return
+      }
+
       if (url === "/" || url.startsWith("/?")) {
         const status = this.options.homeStatus ?? 200
-        res.writeHead(status, { "Content-Type": "text/html" })
+        const headers: http.OutgoingHttpHeaders = {
+          "Content-Type": "text/html",
+        }
+        if (this.options.connectApiKey !== undefined) {
+          headers["Set-Cookie"] = "rscid=mock-connect-session; Path=/"
+        }
+        res.writeHead(status, headers)
         res.end(
           "<!DOCTYPE html>\n<html><head>\n" +
             '<base href="_w_abc123/">\n' +

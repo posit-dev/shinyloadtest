@@ -3,9 +3,20 @@ import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
+import { MockShinyServer } from "./helpers/mock-shiny-server.js"
 
 const MAIN_JS = path.resolve("dist/main.mjs")
 const FAKE_URL = "http://127.0.0.1:65535"
+
+// Keep inherited credentials out of CLI tests without changing the parent env.
+const CONNECT_ENV_VARS = [
+  "SHINYLOADTEST_CONNECT_API_KEY",
+  "SHINYCANNON_CONNECT_API_KEY",
+  "SHINYLOADTEST_USER",
+  "SHINYCANNON_USER",
+  "SHINYLOADTEST_PASS",
+  "SHINYCANNON_PASS",
+] as const
 
 // Minimal valid recording content
 const RECORDING_CONTENT = [
@@ -22,12 +33,26 @@ interface RunResult {
   stderr: string
 }
 
-function runCli(args: string[]): Promise<RunResult> {
+function buildCliEnv(
+  overrides: Record<string, string> = {},
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const key of CONNECT_ENV_VARS) {
+    delete env[key]
+  }
+  return { ...env, ...overrides }
+}
+
+function runCli(
+  args: string[],
+  env: Record<string, string> = {},
+  timeoutMs: number = 8000,
+): Promise<RunResult> {
   return new Promise((resolve) => {
     execFile(
       process.execPath,
       [MAIN_JS, ...args],
-      { timeout: 8000 },
+      { timeout: timeoutMs, env: buildCliEnv(env) },
       (error, stdout, stderr) => {
         const exitCode =
           error && "code" in error && typeof error.code === "number"
@@ -39,6 +64,20 @@ function runCli(args: string[]): Promise<RunResult> {
       },
     )
   })
+}
+
+/** Recursively collect the text contents of every file under dir. */
+function collectFileContents(dir: string): string[] {
+  const contents: string[] = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      contents.push(...collectFileContents(full))
+    } else {
+      contents.push(fs.readFileSync(full, "utf-8"))
+    }
+  }
+  return contents
 }
 
 let tempDir: string
@@ -166,4 +205,136 @@ describe("CLI Process", () => {
     expect(result.stdout).toContain("--workers")
     expect(result.stdout).toContain("recording")
   }, 10000)
+})
+
+// ---------------------------------------------------------------------------
+// Replay against a login-protected Posit Connect mock (GitHub #7)
+// ---------------------------------------------------------------------------
+
+const FAKE_API_KEY = "slt-fake-connect-key-9876543210abcdef"
+const CUSTOM_HEADER_VALUE = "retained-by-cli"
+
+function replayArgs(
+  recordingPath: string,
+  appUrl: string,
+  outputDir: string,
+): string[] {
+  return [
+    "replay",
+    recordingPath,
+    appUrl,
+    "--workers",
+    "1",
+    "--loaded-duration-minutes",
+    "0.01",
+    "--start-interval",
+    "0",
+    "--max-errors",
+    "1",
+    "-H",
+    `X-Test: ${CUSTOM_HEADER_VALUE}`,
+    "-H",
+    "authorization: Bearer superseded",
+    "--output-dir",
+    outputDir,
+    "--debug-log",
+    "--log-level",
+    "debug",
+  ]
+}
+
+describe.each(["SHINYLOADTEST_CONNECT_API_KEY", "SHINYCANNON_CONNECT_API_KEY"])(
+  "CLI Process replay with Connect API key (%s)",
+  (envVar) => {
+    it("replays a login-protected Connect app successfully", async () => {
+      const mock = new MockShinyServer({ connectApiKey: FAKE_API_KEY })
+      await mock.start()
+
+      const tmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "shinyloadtest-replay-cli-"),
+      )
+      try {
+        const recordingPath = path.join(tmpDir, "recording.log")
+        fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
+        const outputDir = path.join(tmpDir, "output")
+
+        const result = await runCli(
+          replayArgs(recordingPath, mock.url, outputDir),
+          { [envVar]: FAKE_API_KEY },
+          60000,
+        )
+
+        expect(result.exitCode).toBe(0)
+
+        expect(mock.httpRequests.length).toBeGreaterThan(0)
+        for (const headers of mock.httpRequests) {
+          expect(headers).toMatchObject({
+            authorization: `Key ${FAKE_API_KEY}`,
+            "x-test": CUSTOM_HEADER_VALUE,
+          })
+        }
+
+        expect(mock.wsRequests.length).toBeGreaterThanOrEqual(1)
+        for (const headers of mock.wsRequests) {
+          expect(headers).toMatchObject({
+            authorization: `Key ${FAKE_API_KEY}`,
+            "x-test": CUSTOM_HEADER_VALUE,
+          })
+          expect(headers.cookie).toContain("rscid=mock-connect-session")
+        }
+
+        const sessionsDir = path.join(outputDir, "sessions")
+        const csvNames = fs
+          .readdirSync(sessionsDir)
+          .filter((name) => name.endsWith(".csv"))
+        expect(csvNames.length).toBeGreaterThan(0)
+        const csvs = csvNames.map((name) =>
+          fs.readFileSync(path.join(sessionsDir, name), "utf-8"),
+        )
+        expect(csvs.join("\n")).toContain("PLAYBACK_DONE")
+
+        const allOutput = [
+          ...collectFileContents(outputDir),
+          result.stdout,
+          result.stderr,
+        ].join("\n")
+        expect(allOutput).not.toContain(FAKE_API_KEY)
+      } finally {
+        await mock.stop()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      }
+    }, 60000)
+  },
+)
+
+describe("CLI Process replay with invalid Connect API key", () => {
+  it("fails at preflight with HTTP 401 and never opens a WebSocket", async () => {
+    const mock = new MockShinyServer({ connectApiKey: "correct-mock-key" })
+    await mock.start()
+
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "shinyloadtest-invalid-key-"),
+    )
+    try {
+      const recordingPath = path.join(tmpDir, "recording.log")
+      fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
+      const outputDir = path.join(tmpDir, "output")
+
+      const result = await runCli(
+        replayArgs(recordingPath, mock.url, outputDir),
+        { SHINYLOADTEST_CONNECT_API_KEY: "wrong-key-value" },
+        60000,
+      )
+
+      expect(result.exitCode).not.toBe(0)
+
+      expect(mock.httpRequests).toHaveLength(1)
+      expect(mock.httpRequests[0]?.authorization).toMatch(/^Key /)
+      expect(result.stderr).toContain("HTTP 401")
+      expect(mock.wsRequests).toHaveLength(0)
+    } finally {
+      await mock.stop()
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  }, 60000)
 })

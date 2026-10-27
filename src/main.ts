@@ -13,6 +13,7 @@ import { SERVER_TYPE_NAMES, ServerType } from "./types.js"
 import { HttpClient, HttpStatusError } from "./http.js"
 import { detectServerType, AppDetectionError } from "./detect.js"
 import { ReplayTerminalUI } from "./replay/ui.js"
+import { withConnectApiKey } from "./auth.js"
 
 async function main(): Promise<void> {
   const result = parseArgs()
@@ -71,7 +72,8 @@ async function main(): Promise<void> {
   // Detect live server type for validation
   const detectionClient = new HttpClient({
     cookieJar: new CookieJar(),
-    headers: args.headers,
+    // Runtime credentials must not enter args.headers, which is serialized to CSV.
+    headers: withConnectApiKey(args.headers, args.creds.connectApiKey),
     userAgent: `shinyloadtest/${VERSION}`,
   })
 

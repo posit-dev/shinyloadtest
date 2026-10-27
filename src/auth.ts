@@ -115,6 +115,20 @@ export function connectApiKeyHeader(apiKey: string): Record<string, string> {
   return { Authorization: `Key ${apiKey}` }
 }
 
+export function withConnectApiKey(
+  headers: Record<string, string>,
+  apiKey: string | null,
+): Record<string, string> {
+  if (apiKey === null) return { ...headers }
+
+  const customHeaders = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name]) => name.toLowerCase() !== "authorization",
+    ),
+  )
+  return { ...customHeaders, ...connectApiKeyHeader(apiKey) }
+}
+
 // ---------------------------------------------------------------------------
 // Credentials from environment
 // ---------------------------------------------------------------------------

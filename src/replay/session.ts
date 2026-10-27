@@ -14,7 +14,7 @@ import {
   loginRSC,
   loginSSP,
   getConnectCookies,
-  connectApiKeyHeader,
+  withConnectApiKey,
 } from "../auth.js"
 import { detectServerType } from "../detect.js"
 import {
@@ -177,13 +177,12 @@ async function maybeLogin(
   httpClient: HttpClient,
   httpUrl: string,
   creds: Creds,
-  headers: Record<string, string>,
   logger: Logger,
-): Promise<Record<string, string>> {
+): Promise<void> {
   // Connect API Key takes precedence
   if (hasConnectApiKey(creds)) {
     await getConnectCookies(httpClient, httpUrl)
-    return { ...headers, ...connectApiKeyHeader(creds.connectApiKey!) }
+    return
   }
 
   if (hasUserPass(creds)) {
@@ -212,8 +211,6 @@ async function maybeLogin(
       )
     }
   }
-
-  return headers
 }
 
 // ---------------------------------------------------------------------------
@@ -693,8 +690,8 @@ export async function runSession(
   const cookieJar = new CookieJar()
   const tokenDictionary = createTokenDictionary()
 
-  // Merge Connect API key header if applicable
-  let headers = { ...config.headers }
+  // Authenticate the cookie bootstrap as well as recorded requests.
+  const headers = withConnectApiKey(config.headers, creds.connectApiKey)
 
   const httpClient = new HttpClient({
     cookieJar,
@@ -740,9 +737,7 @@ export async function runSession(
     )
 
     // Login if needed
-    headers = await maybeLogin(httpClient, httpUrl, creds, headers, logger)
-    state.headers = headers
-    httpClient.setHeaders(headers)
+    await maybeLogin(httpClient, httpUrl, creds, logger)
 
     // Start delay
     if (startDelayMs !== undefined && startDelayMs > 0) {
