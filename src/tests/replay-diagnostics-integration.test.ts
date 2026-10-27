@@ -119,6 +119,17 @@ async function failingServer(status: number, stall = false) {
   }
 }
 
+function replayEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  delete env.SHINYLOADTEST_CONNECT_API_KEY
+  delete env.SHINYCANNON_CONNECT_API_KEY
+  delete env.SHINYLOADTEST_USER
+  delete env.SHINYLOADTEST_PASS
+  delete env.SHINYCANNON_USER
+  delete env.SHINYCANNON_PASS
+  return env
+}
+
 function events(outputDir: string): Array<Record<string, unknown>> {
   return fs
     .readFileSync(path.join(outputDir, "diagnostics.jsonl"), "utf8")
@@ -222,18 +233,80 @@ describe("Connect bootstrap hardening", () => {
 })
 
 describe("Replay diagnostics integration", () => {
+  it.each(["SHINYLOADTEST_CONNECT_API_KEY", "SHINYCANNON_CONNECT_API_KEY"])(
+    "authenticates protected replay with %s and diagnostics without exporting the key",
+    async (envVar) => {
+      const key = "stack-env-secret-sentinel"
+      const mock = new MockShinyServer({ connectApiKey: key })
+      await mock.start()
+      cleanups.push(() => mock.stop())
+      const config = setup(mock.makeRecording())
+      const env = replayEnvironment()
+      env[envVar] = key
+
+      await promisify(execFile)(
+        process.execPath,
+        [
+          path.resolve("dist/main.mjs"),
+          "replay",
+          config.recordingPath,
+          mock.url,
+          "--output-dir",
+          config.outputDir,
+          "--overwrite-output",
+          "--diagnostics",
+          "--workers",
+          "1",
+          "--start-interval",
+          "0",
+          "--loaded-duration-minutes",
+          "0.001",
+          "--max-errors",
+          "1",
+        ],
+        { env, timeout: 15000 },
+      )
+
+      expect(mock.httpRequests.length).toBeGreaterThan(1)
+      for (const headers of mock.httpRequests)
+        expect(headers.authorization).toBe(`Key ${key}`)
+      expect(mock.wsRequests.length).toBeGreaterThan(0)
+      for (const headers of mock.wsRequests) {
+        expect(headers.authorization).toBe(`Key ${key}`)
+        expect(headers.cookie).toContain("rscid=mock-connect-session")
+      }
+      expect(events(config.outputDir)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "http_complete",
+            phase: "bootstrap",
+            statusCode: 200,
+          }),
+          expect.objectContaining({ type: "session_end", outcome: "done" }),
+          expect.objectContaining({ type: "ws_closed", origin: "client" }),
+        ]),
+      )
+      expect(events(config.outputDir).at(-1)).toMatchObject({
+        type: "run_end",
+        complete: true,
+        activeSockets: 0,
+      })
+      const files = fs
+        .readdirSync(config.outputDir, { recursive: true })
+        .map((file) => path.join(config.outputDir, file.toString()))
+        .filter((file) => fs.statSync(file).isFile())
+      for (const file of files)
+        expect(fs.readFileSync(file, "utf8")).not.toContain(key)
+    },
+    20000,
+  )
+
   it("flushes diagnostics before the built CLI exits, without exporting explicit headers", async () => {
     const mock = new MockShinyServer()
     await mock.start()
     cleanups.push(() => mock.stop())
     const config = setup(mock.makeRecording())
-    const env = { ...process.env }
-    delete env.SHINYLOADTEST_CONNECT_API_KEY
-    delete env.SHINYCANNON_CONNECT_API_KEY
-    delete env.SHINYLOADTEST_USER
-    delete env.SHINYLOADTEST_PASS
-    delete env.SHINYCANNON_USER
-    delete env.SHINYCANNON_PASS
+    const env = replayEnvironment()
 
     await promisify(execFile)(
       process.execPath,
