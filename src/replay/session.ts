@@ -37,6 +37,7 @@ import {
 } from "../types.js"
 import { joinPaths, httpToWs } from "../url.js"
 import { ShinyWebSocket } from "./websocket.js"
+import type { DiagnosticContext, ReplayDiagnostics } from "./diagnostics.js"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -109,6 +110,8 @@ export class Stats {
 // SessionConfig
 // ---------------------------------------------------------------------------
 
+export type SessionOutcome = "done" | "failed" | "canceled"
+
 export interface SessionConfig {
   sessionId: number
   workerId: number
@@ -123,6 +126,7 @@ export interface SessionConfig {
   argsString: string
   argsJson: string
   signal?: AbortSignal
+  diagnostics?: ReplayDiagnostics
   /** Called after each recording event is processed. */
   onProgress?: (eventIndex: number, totalEvents: number) => void
 }
@@ -178,10 +182,11 @@ async function maybeLogin(
   httpUrl: string,
   creds: Creds,
   logger: Logger,
+  signal?: AbortSignal,
 ): Promise<void> {
   // Connect API Key takes precedence
   if (hasConnectApiKey(creds)) {
-    await getConnectCookies(httpClient, httpUrl)
+    await getConnectCookies(httpClient, httpUrl, signal)
     return
   }
 
@@ -238,6 +243,8 @@ interface SessionState {
   headers: Record<string, string>
   creds: Creds
   signal?: AbortSignal
+  diagnostics?: ReplayDiagnostics
+  diagnosticContext: DiagnosticContext
   /** Messages received out of order, waiting to be matched by a later WS_RECV. */
   reorderBuffer: string[]
 }
@@ -366,6 +373,9 @@ async function handleWsOpen(
   const ws = new ShinyWebSocket({
     url: wsUrl,
     headers: wsHeaders,
+    diagnostics: state.diagnostics
+      ? { writer: state.diagnostics, context: state.diagnosticContext }
+      : undefined,
     onIgnored: (msg) => {
       state.logger.debug(`Ignoring: ${msg}`)
     },
@@ -671,7 +681,7 @@ export async function runSession(
   config: SessionConfig,
   stats: Stats,
   startDelayMs?: number,
-): Promise<void> {
+): Promise<SessionOutcome> {
   const {
     sessionId,
     workerId,
@@ -686,6 +696,8 @@ export async function runSession(
     argsJson,
   } = config
   const signal = config.signal
+  const diagnostics = config.diagnostics
+  const diagnosticContext = { sessionId, workerId, iterationId }
 
   const cookieJar = new CookieJar()
   const tokenDictionary = createTokenDictionary()
@@ -697,6 +709,9 @@ export async function runSession(
     cookieJar,
     headers,
     userAgent: USER_AGENT,
+    diagnostics: diagnostics
+      ? { writer: diagnostics, context: diagnosticContext }
+      : undefined,
   })
 
   const writer = new SessionWriter({
@@ -720,10 +735,14 @@ export async function runSession(
     headers,
     creds,
     signal,
+    diagnostics,
+    diagnosticContext,
     reorderBuffer: [],
   }
 
   let started = false
+  let outcome: SessionOutcome = "failed"
+  diagnostics?.emit({ type: "session_start", ...diagnosticContext })
 
   try {
     writer.writeCsv(
@@ -737,7 +756,9 @@ export async function runSession(
     )
 
     // Login if needed
-    await maybeLogin(httpClient, httpUrl, creds, logger)
+    if (signal?.aborted) throw signal.reason ?? new Error("Aborted")
+    await maybeLogin(httpClient, httpUrl, creds, logger, signal)
+    httpClient.setDiagnosticPhase("playback")
 
     // Start delay
     if (startDelayMs !== undefined && startDelayMs > 0) {
@@ -850,12 +871,14 @@ export async function runSession(
       0,
       "",
     )
+    outcome = "done"
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err))
     const aborted =
       signal?.aborted === true &&
       (error.name === "AbortError" || signal.reason === err)
     if (aborted) {
+      outcome = "canceled"
       // Graceful shutdown — don't count as failure
       if (started) {
         stats.transition("canceled")
@@ -887,7 +910,8 @@ export async function runSession(
         0,
         "",
       )
-      logger.error(`Playback failed: ${error.message}`, error)
+      const failurePhase = started ? "" : "Session setup: "
+      logger.error(`Playback failed: ${failurePhase}${error.message}`, error)
     }
   } finally {
     if (state.webSocket !== null) {
@@ -899,5 +923,7 @@ export async function runSession(
       state.webSocket = null
     }
     writer.close()
+    diagnostics?.emit({ type: "session_end", ...diagnosticContext, outcome })
   }
+  return outcome
 }

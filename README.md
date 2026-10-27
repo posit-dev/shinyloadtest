@@ -75,8 +75,81 @@ is omitted, the target URL from the recording file is used.
 | `-H, --header <header>` | Custom HTTP header, repeatable |
 | `--output-dir <dir>` | Directory for session logs |
 | `--overwrite-output` | Overwrite existing output directory |
+| `--max-errors <n>` | Stop the test after this many cumulative session failures (0 to disable, default: workers * 5) |
 | `--debug-log` | Write verbose debug log |
+| `--diagnostics` | Write a credential-free diagnostics event log (`diagnostics.jsonl`) to the output directory (default: off) |
 | `--log-level <level>` | Console log level: `debug`, `info`, `warn`, `error` (default: `warn`) |
+
+When a session fails, its worker waits before the next attempt: about 1s
+after the first failure, doubling per consecutive failure up to 30s, with
+±25% jitter so workers that fail together don't retry in lockstep. A
+successful session resets the delay. Waiting workers are not active app
+sessions: the requested worker count is not proof of achieved concurrency
+when sessions are failing. This changes failure traffic compared to earlier
+alphas, which retried immediately; it reduces request
+amplification during failures but is not a fix for any particular
+server-side cause, so a baseline run with an earlier version can still be
+informative when reproducing an older report.
+
+### Diagnostics
+
+`--diagnostics` writes `diagnostics.jsonl` to the output directory: one JSON
+object per line, each with `schemaVersion`, `timestamp` (Unix time in
+milliseconds), and `type` plus only the allowlisted fields for that event
+type. Durations and retry delays are also in milliseconds. The events cover the session
+lifecycle (`session_start`; `session_end` with a `done`/`failed`/`canceled`
+outcome), HTTP requests split into `bootstrap` (authentication/session setup) and
+`playback` phases with method, status code, and duration, and an `aborted`
+flag on errors; the WebSocket lifecycle (`ws_created`, `ws_open`,
+`ws_close_requested`, `ws_error`, and `ws_closed` with close code and close
+origin); and `retry_wait` backoff delays. `run_start` records the shinyloadtest
+and Node.js versions and the worker/max-errors settings.
+
+Only IDs, event types, status codes, durations, counts, and enum-like
+outcomes are written. No URLs, headers, cookies, request bodies, credentials,
+or free-form error messages can reach the file: each line is built from a
+per-event field whitelist, so extra properties are dropped even if a caller
+attaches them by mistake.
+
+Things to know when reading the file:
+
+- It shows what the client did. shinyloadtest cannot observe server-side
+  state: `ws_closed` records the client-side view of the transport, not
+  whether the server (e.g. Posit Connect) considers its logical session
+  released.
+- The writer starts after server preflight validation, so it records replay
+  sessions only — the requests made to detect the server type are not in
+  the log.
+- On an orderly finish, `run_end` is the last line, with `activeSockets`
+  (WebSockets that never reported closure within the wait window) and a
+  `complete` flag. Ctrl+C or `SIGTERM` exits immediately: a file with no
+  `run_end` line is an interrupted run — the events that were written are
+  valid, but the tail of the run is missing.
+
+#### Sharing diagnostics
+
+To report a problem, share **only** the `diagnostics.jsonl` file, plus
+sanitized recordings and server logs. Do not share the session CSVs: each
+one embeds the full command line as a comment line, which contains any
+headers passed with `-H` (typically an API key). Do not share the debug log
+either — it records full WebSocket message payloads. If the test uses several
+concurrent CLI processes, collect one diagnostics file from each output
+directory and label them by recording and worker count. Keep the original
+workload settings and add `--diagnostics`; use a separate output directory
+for each process. Client “done” outcomes indicate completed playback, not
+verified app results or released server sessions.
+
+To run a specific branch locally instead of an installed version:
+
+```bash
+git clone https://github.com/posit-dev/shinyloadtest.git
+cd shinyloadtest
+git checkout <branch>
+npm ci
+npm run build
+node dist/main.mjs replay recording.log https://example.com/app --diagnostics
+# or install the checkout globally: npm install -g .
+```
 
 ## Report
 

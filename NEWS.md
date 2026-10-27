@@ -31,6 +31,15 @@ published as `shinyloadtest` on npm.
 
 * Added support for Jupyter widget / shinywidgets messages in recordings.
 
+* Replay workers now back off between failed session attempts: about 1s after
+  the first failure, doubling per consecutive failure up to 30s, with ±25%
+  jitter, reset after a successful session. Earlier alphas retried immediately.
+
+* Added `--diagnostics` to `replay` (off by default): writes a credential-free
+  `diagnostics.jsonl` event log to the output directory, covering session
+  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, and
+  retry delays. No URLs, headers, credentials, or error strings are recorded.
+
 * The recording format, output format, and analysis workflows with the
   shinyloadtest R package are fully compatible with previous versions.
 

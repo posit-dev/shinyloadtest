@@ -27,6 +27,12 @@ export interface ParsedArgs {
   debugLog: boolean
   logLevel: LogLevel
   creds: Creds
+  /**
+   * Whether replay writes a credential-free diagnostics event log. Optional
+   * so existing ParsedArgs fixtures keep compiling; parseArgs always sets
+   * it to a boolean.
+   */
+  diagnostics?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +77,9 @@ export function serializeArgs(args: ParsedArgs): {
   if (args.debugLog) {
     parts.push("--debug-log")
   }
+  if (args.diagnostics) {
+    parts.push("--diagnostics")
+  }
   parts.push(`--log-level ${LOG_LEVEL_NAMES[args.logLevel]}`)
 
   const argsString = parts.join(" ")
@@ -86,6 +95,9 @@ export function serializeArgs(args: ParsedArgs): {
     overwriteOutput: args.overwriteOutput,
     debugLog: args.debugLog,
     logLevel: LOG_LEVEL_NAMES[args.logLevel],
+  }
+  if (args.diagnostics !== undefined) {
+    jsonObj.diagnostics = args.diagnostics
   }
   const argsJson = JSON.stringify(jsonObj)
 
@@ -228,6 +240,11 @@ export function parseArgs(argv?: string[]): CliResult {
     )
     .option("--debug-log", "Write verbose debug log", false)
     .option(
+      "--diagnostics",
+      "Write a credential-free diagnostics event log (diagnostics.jsonl) to the output directory",
+      false,
+    )
+    .option(
       "--log-level <level>",
       "Console log level: debug, info, warn, error",
       "warn",
@@ -253,6 +270,7 @@ export function parseArgs(argv?: string[]): CliResult {
           outputDir: string
           overwriteOutput: boolean
           debugLog: boolean
+          diagnostics: boolean
           logLevel: string
         },
       ) => {
@@ -332,6 +350,7 @@ export function parseArgs(argv?: string[]): CliResult {
             overwriteOutput: opts.overwriteOutput,
             debugLog: opts.debugLog,
             logLevel: parseLogLevel(opts.logLevel),
+            diagnostics: opts.diagnostics,
             creds: getCreds(),
           },
         }

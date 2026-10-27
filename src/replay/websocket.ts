@@ -4,6 +4,7 @@
 import WebSocket from "ws"
 import { canIgnore } from "../sockjs.js"
 import { RECEIVE_QUEUE_SIZE } from "../types.js"
+import type { DiagnosticContext, ReplayDiagnostics } from "./diagnostics.js"
 
 // ---------------------------------------------------------------------------
 // AsyncQueue
@@ -125,17 +126,37 @@ export class ShinyWebSocket {
   private _closedByClient = false
   private _terminalError: Error | null = null
   private failureCallback: ((error: Error) => void) | null = null
+  private readonly diagnostics?: {
+    writer: ReplayDiagnostics
+    context: DiagnosticContext
+    socketId: number
+  }
 
   constructor(options: {
     url: string
     headers: Record<string, string>
     onIgnored?: (msg: string) => void
+    diagnostics?: { writer: ReplayDiagnostics; context: DiagnosticContext }
   }) {
     this.receiveQueue = new AsyncQueue<WSMessage>(RECEIVE_QUEUE_SIZE)
+    const tracked = options.diagnostics?.writer.registerSocket()
+    this.diagnostics =
+      options.diagnostics && tracked
+        ? { ...options.diagnostics, socketId: tracked.socketId }
+        : undefined
+    this.emitSocketEvent("ws_created")
 
-    this.ws = new WebSocket(options.url, {
-      headers: options.headers,
-    })
+    try {
+      this.ws = new WebSocket(options.url, {
+        headers: options.headers,
+      })
+    } catch (error) {
+      this.emitSocketEvent("ws_error")
+      tracked?.closed()
+      throw error
+    }
+
+    this.ws.on("open", () => this.emitSocketEvent("ws_open"))
 
     this.ws.on("message", (data: WebSocket.Data) => {
       const msg = data.toString()
@@ -163,10 +184,19 @@ export class ShinyWebSocket {
     })
 
     this.ws.on("error", (err: Error) => {
+      this.emitSocketEvent("ws_error")
       this.triggerFailure(err)
     })
 
-    this.ws.on("close", (_code: number, _reason: Buffer) => {
+    this.ws.on("close", (code: number, _reason: Buffer) => {
+      this.diagnostics?.writer.emit({
+        type: "ws_closed",
+        ...this.diagnostics.context,
+        socketId: this.diagnostics.socketId,
+        closeCode: code,
+        origin: this._closedByClient ? "client" : "other",
+      })
+      tracked?.closed()
       if (!this._closedByClient) {
         this._closedByServer = true
         this.triggerFailure(new Error("Server closed websocket connection"))
@@ -219,8 +249,19 @@ export class ShinyWebSocket {
 
   /** Close the WebSocket connection (client-initiated). */
   close(): void {
+    if (!this._closedByClient) this.emitSocketEvent("ws_close_requested")
     this._closedByClient = true
     this.ws.close()
+  }
+
+  private emitSocketEvent(
+    type: "ws_created" | "ws_open" | "ws_close_requested" | "ws_error",
+  ): void {
+    this.diagnostics?.writer.emit({
+      type,
+      ...this.diagnostics.context,
+      socketId: this.diagnostics.socketId,
+    })
   }
 
   /** Whether the connection was closed by the server. */
