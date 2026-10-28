@@ -135,21 +135,35 @@ export interface SessionConfig {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+function sleep(
+  ms: number,
+  signal?: AbortSignal,
+  failureSignal?: AbortSignal,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(signal.reason ?? new Error("Aborted"))
+    const signals = [signal, failureSignal].filter(
+      (value): value is AbortSignal => value !== undefined,
+    )
+    const aborted = signals.find((value) => value.aborted)
+    if (aborted) {
+      reject(aborted.reason ?? new Error("Aborted"))
       return
     }
-    const onAbort = () => {
+    const cleanup = () => {
+      for (const value of signals) value.removeEventListener("abort", onAbort)
+    }
+    const onAbort = (event: Event) => {
       clearTimeout(timer)
-      reject(signal!.reason ?? new Error("Aborted"))
+      cleanup()
+      reject((event.target as AbortSignal).reason ?? new Error("Aborted"))
     }
     const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort)
+      cleanup()
       resolve()
     }, ms)
-    signal?.addEventListener("abort", onAbort, { once: true })
+    for (const value of signals) {
+      value.addEventListener("abort", onAbort, { once: true })
+    }
   })
 }
 
@@ -222,14 +236,46 @@ async function maybeLogin(
 // Event handlers
 // ---------------------------------------------------------------------------
 
-/** Max messages to read ahead when looking for a key-matching message. */
-const WS_RECV_LOOKAHEAD = 15
+/** Cap receive deadlines and post-skip pacing at 15 minutes. A genuinely
+ * longer quiet interval may therefore be skipped rather than waited out. */
+const WS_RECV_MAX_GAP_MS = 15 * 60_000
 
-/** Timeout (ms) for the first receive poll in handleWsRecv. */
-const WS_RECV_POLL_MS = 30_000
+/** Minimum receive wait and slack beyond the recorded quiet interval. */
+const WS_RECV_SLACK_MS = 30_000
 
-/** Short timeout (ms) for lookahead polls after the first receive. */
-const WS_RECV_LOOKAHEAD_POLL_MS = 2_000
+/** Maximum mismatched messages buffered while looking for one receive. */
+const WS_RECV_MISMATCH_LIMIT = 15
+
+interface TimingAnchor {
+  recorded: number
+  /** Monotonic time, so wall-clock adjustments cannot extend a wait. */
+  actual: number
+}
+
+// Safe, payload-free result for the diagnostics follow-up.
+type ReceiveResult = {
+  reason:
+    | "matched"
+    | "ignored"
+    | "timeout"
+    | "mismatch_timeout"
+    | "mismatch_limit"
+  line: number
+}
+
+function remainingRecordedGap(
+  event: RecordingEvent,
+  anchor: TimingAnchor | null,
+): number {
+  if (anchor === null) return 0
+  const gap = event.begin - anchor.recorded
+  const elapsed = performance.now() - anchor.actual
+  const boundedGap = Number.isFinite(gap)
+    ? Math.min(WS_RECV_MAX_GAP_MS, Math.max(0, gap))
+    : 0
+  const validElapsed = Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0
+  return Math.max(0, boundedGap - validElapsed)
+}
 
 interface SessionState {
   httpClient: HttpClient
@@ -240,6 +286,7 @@ interface SessionState {
   logger: Logger
   webSocket: ShinyWebSocket | null
   failure: Error | null
+  failureController: AbortController
   headers: Record<string, string>
   creds: Creds
   signal?: AbortSignal
@@ -247,6 +294,8 @@ interface SessionState {
   diagnosticContext: DiagnosticContext
   /** Messages received out of order, waiting to be matched by a later WS_RECV. */
   reorderBuffer: string[]
+  timingAnchor: TimingAnchor | null
+  skippedReceive: boolean
 }
 
 function replaceSessionTokens(
@@ -383,6 +432,7 @@ async function handleWsOpen(
 
   ws.onFailure((error) => {
     state.failure = error
+    state.failureController.abort(error)
   })
 
   state.webSocket = ws
@@ -461,7 +511,7 @@ function messageKeys(raw: string): string {
 async function handleWsRecv(
   event: RecordingEvent & { type: "WS_RECV" },
   state: SessionState,
-): Promise<void> {
+): Promise<ReceiveResult> {
   if (state.webSocket === null) {
     throw new Error("Tried to WS_RECV but no websocket is open")
   }
@@ -473,7 +523,7 @@ async function handleWsRecv(
     state.logger.debug(
       `WS_RECV line ${event.lineNumber}: expected message is now ignorable, skipping`,
     )
-    return
+    return { reason: "ignored", line: event.lineNumber }
   }
 
   const expectingStr = replaceSessionTokens(
@@ -488,7 +538,7 @@ async function handleWsRecv(
     if (expectingStr !== receivedStr) {
       throw new Error(`Expected string ${expectingStr} but got ${receivedStr}`)
     }
-    return
+    return { reason: "matched", line: event.lineNumber }
   }
 
   const expectingKeys = Object.keys(expectingObj).sort().join(",")
@@ -502,57 +552,62 @@ async function handleWsRecv(
     state.logger.debug(`WS_RECV matched from reorder buffer: ${matched}`)
     const receivedObj = parseMessage(normalizeMessage(matched))
     extractCommIdMapping(expectingObj, receivedObj, state)
-    return
+    return { reason: "matched", line: event.lineNumber }
   }
 
-  // 2. Poll for messages: first attempt uses a longer timeout (pacing), then
-  //    shorter lookahead polls. This is bounded so we never block forever if
-  //    the server doesn't send the expected message.
-  for (let attempt = 0; attempt <= WS_RECV_LOOKAHEAD; attempt++) {
-    const timeoutMs =
-      attempt === 0 ? WS_RECV_POLL_MS : WS_RECV_LOOKAHEAD_POLL_MS
-
-    const msg = await state.webSocket.receiveQueue.poll(timeoutMs, state.signal)
+  // One deadline covers all polls, including after mismatched messages.
+  const timeoutMs = Math.min(
+    WS_RECV_MAX_GAP_MS,
+    Math.max(
+      WS_RECV_SLACK_MS,
+      remainingRecordedGap(event, state.timingAnchor) + WS_RECV_SLACK_MS,
+    ),
+  )
+  const deadline = performance.now() + timeoutMs
+  let mismatches = 0
+  while (mismatches < WS_RECV_MISMATCH_LIMIT) {
+    const remaining = deadline - performance.now()
+    if (remaining <= 0) break
+    const msg = await state.webSocket.receiveQueue.poll(remaining, state.signal)
 
     if (state.signal?.aborted) throw state.signal.reason ?? new Error("Aborted")
-
-    if (msg === null) {
-      if (attempt === 0) {
-        // First poll timed out — no message at all. Warn and skip.
-        state.logger.warn(
-          `WS_RECV line ${event.lineNumber}: no message received after ${timeoutMs / 1000}s, skipping`,
-        )
-        return
-      }
-      break // Lookahead exhausted, fall through to warn.
-    }
-
+    if (msg === null) break
     if (msg.kind === "error") throw msg.error
 
     const receivedStr = msg.text
-    state.logger.debug(
-      `WS_RECV ${attempt === 0 ? "received" : "lookahead received"}: ${receivedStr}`,
-    )
+    state.logger.debug(`WS_RECV received: ${receivedStr}`)
     const receivedKeys = messageKeys(receivedStr)
 
     if (expectingKeys === receivedKeys) {
       const receivedObj = parseMessage(normalizeMessage(receivedStr))
       extractCommIdMapping(expectingObj, receivedObj, state)
-      return
+      return { reason: "matched", line: event.lineNumber }
     }
 
-    // Mismatch — buffer for a later WS_RECV.
     state.reorderBuffer.push(receivedStr)
+    mismatches++
     state.logger.debug(
       `WS_RECV reorder: buffered [${receivedKeys}], looking for [${expectingKeys}]`,
     )
   }
 
-  // No match found — warn and continue. For load testing, strict key matching
-  // is less important than keeping the session alive and pacing sends.
+  if (mismatches === 0) {
+    state.logger.warn(
+      `WS_RECV line ${event.lineNumber}: no message received after ${timeoutMs / 1000}s, skipping`,
+    )
+    return { reason: "timeout", line: event.lineNumber }
+  }
+
   state.logger.warn(
     `WS_RECV line ${event.lineNumber}: expected [${expectingKeys}] but no match found after lookahead, continuing`,
   )
+  return {
+    reason:
+      mismatches === WS_RECV_MISMATCH_LIMIT
+        ? "mismatch_limit"
+        : "mismatch_timeout",
+    line: event.lineNumber,
+  }
 }
 
 /** Receive the next non-ignorable message from the WebSocket. */
@@ -644,7 +699,7 @@ function handleWsClose(
 async function handleEvent(
   event: RecordingEvent,
   state: SessionState,
-): Promise<void> {
+): Promise<ReceiveResult | void> {
   switch (event.type) {
     case "REQ_HOME":
       return handleReqHome(event, state)
@@ -732,12 +787,15 @@ export async function runSession(
     logger,
     webSocket: null,
     failure: null,
+    failureController: new AbortController(),
     headers,
     creds,
     signal,
     diagnostics,
     diagnosticContext,
     reorderBuffer: [],
+    timingAnchor: null,
+    skippedReceive: false,
   }
 
   let started = false
@@ -791,11 +849,14 @@ export async function runSession(
     let eventIndex = 0
 
     for (const event of recording.events) {
-      const sleepFor = sleepBefore(
-        event,
-        lastEventEnded,
-        state.webSocket !== null,
-      )
+      const needsResidualPacing =
+        state.skippedReceive &&
+        (event.type === "WS_SEND" ||
+          event.type === "WS_CLOSE" ||
+          (event.type === "REQ_GET" && state.webSocket !== null))
+      const sleepFor = needsResidualPacing
+        ? remainingRecordedGap(event, state.timingAnchor)
+        : sleepBefore(event, lastEventEnded, state.webSocket !== null)
 
       if (sleepFor > 0) {
         writer.writeCsv(
@@ -807,7 +868,7 @@ export async function runSession(
           event.lineNumber,
           "",
         )
-        await sleep(sleepFor, signal)
+        await sleep(sleepFor, signal, state.failureController.signal)
         writer.writeCsv(
           sessionId,
           workerId,
@@ -839,7 +900,16 @@ export async function runSession(
         "",
       )
 
-      await handleEvent(event, state)
+      const receiveResult = await handleEvent(event, state)
+      if (receiveResult && receiveResult.reason !== "matched") {
+        state.skippedReceive = true
+      } else {
+        state.timingAnchor = {
+          recorded: event.begin,
+          actual: performance.now(),
+        }
+        state.skippedReceive = false
+      }
       stats.recordEvent()
       config.onProgress?.(++eventIndex, totalEvents)
 

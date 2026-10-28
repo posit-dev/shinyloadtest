@@ -94,6 +94,51 @@ describe("ShinyWebSocket malformed frame handling", () => {
   })
 })
 
+describe("ShinyWebSocket queue and shutdown", () => {
+  it("delivers a real message and closes promptly after a canceled queue wait", async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    await new Promise<void>((resolve) => wss.once("listening", resolve))
+    const { port } = wss.address() as { port: number }
+    let messagesSent = 0
+    let closes = 0
+    const serverClosed = new Promise<void>((resolve) => {
+      wss.once("connection", (ws) => {
+        ws.once("close", () => {
+          closes++
+          resolve()
+        })
+        ws.send(
+          JSON.stringify({
+            values: { synthetic: 1 },
+            errors: {},
+            inputMessages: [],
+          }),
+        )
+        messagesSent++
+      })
+    })
+    const socket = new ShinyWebSocket({
+      url: `ws://127.0.0.1:${port}`,
+      headers: {},
+    })
+    try {
+      const first = await socket.receiveQueue.poll(1_000)
+      expect(first?.kind).toBe("text")
+      const controller = new AbortController()
+      const pending = socket.receiveQueue.poll(10_000, controller.signal)
+      controller.abort()
+      expect(await pending).toBeNull()
+      socket.close()
+      await serverClosed
+      expect(messagesSent).toBe(1)
+      expect(closes).toBe(1)
+    } finally {
+      socket.close()
+      await new Promise<void>((resolve) => wss.close(() => resolve()))
+    }
+  })
+})
+
 describe("WSMessage", () => {
   it("represents text messages", () => {
     const msg: WSMessage = { kind: "text", text: "hello" }
