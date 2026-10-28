@@ -4,6 +4,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { readRecordingFromString } from "../recording.js"
 import { createLogger, LogLevel } from "../logger.js"
+import { ReplayDiagnostics } from "../replay/diagnostics.js"
 import { runSession, Stats } from "../replay/session.js"
 import type { Recording, RecordingEvent } from "../types.js"
 
@@ -124,6 +125,11 @@ function startSession(rec: ReturnType<typeof recording>, signal?: AbortSignal) {
   const stats = new Stats()
   const logger = createLogger({ name: "timing", consoleLevel: LogLevel.SILENT })
   const warnings = vi.spyOn(logger, "warn")
+  const diagnostics = new ReplayDiagnostics({
+    outputDir: tmp,
+    numWorkers: 1,
+    maxErrors: 1,
+  })
   const result = runSession(
     {
       sessionId: 0,
@@ -139,10 +145,41 @@ function startSession(rec: ReturnType<typeof recording>, signal?: AbortSignal) {
       argsString: "test",
       argsJson: "{}",
       signal,
+      diagnostics,
     },
     stats,
-  )
+  ).then(async (outcome) => {
+    await diagnostics.finish()
+    return outcome
+  })
   return { result, stats, warnings }
+}
+
+function expectDiagnostics(
+  outcome: "done" | "failed" | "canceled",
+  counts: [number, number, number, number],
+  skipped: Array<[number, "ignored" | "timeout" | "mismatch"]> = [],
+) {
+  const records = fs
+    .readFileSync(path.join(tmp, "diagnostics.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+  expect(records.filter((record) => record.type === "session_end")).toEqual([
+    expect.objectContaining({
+      outcome,
+      wsRecvMatched: counts[0],
+      wsRecvIgnored: counts[1],
+      wsRecvTimeout: counts[2],
+      wsRecvMismatch: counts[3],
+    }),
+  ])
+  expect(
+    records
+      .filter((record) => record.type === "ws_recv_skipped")
+      .map((record) => [record.inputLineNumber, record.reason]),
+  ).toEqual(skipped)
+  expect(records.at(-1)).toMatchObject({ type: "run_end", complete: true })
 }
 
 function csvEvents() {
@@ -191,6 +228,7 @@ describe("recording-aware receive timing", () => {
     const session = startSession(recording(receives, 210_000))
     await vi.advanceTimersByTimeAsync(220_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [5, 0, 0, 0])
     const events = csvEvents()
     expect(events.filter((e) => e.event === "WS_RECV_END")).toHaveLength(5)
     expect(server.sent).toBe(1)
@@ -206,7 +244,10 @@ describe("recording-aware receive timing", () => {
   })
 
   it("finishes with a finite wait for a missing message", async () => {
-    server.schedule = [{ at: 0, message: update }]
+    server.schedule = [
+      { at: 0, message: update },
+      { at: 5_000, message: ignored },
+    ]
     const session = startSession(
       recording(
         [
@@ -218,6 +259,7 @@ describe("recording-aware receive timing", () => {
     )
     await vi.advanceTimersByTimeAsync(120_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [1, 0, 1, 0], [[7, "timeout"]])
     expect(server.delivered).toBe(1)
     expect(server.closed).toBe(1)
     expect(session.warnings).toHaveBeenCalled()
@@ -236,6 +278,15 @@ describe("recording-aware receive timing", () => {
     )
     await vi.advanceTimersByTimeAsync(90_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics(
+      "done",
+      [0, 0, 3, 0],
+      [
+        [6, "timeout"],
+        [7, "timeout"],
+        [8, "timeout"],
+      ],
+    )
     expect(server.closedAt - epoch).toBe(90_000)
     expect(session.warnings).toHaveBeenCalledTimes(3)
   })
@@ -274,6 +325,7 @@ describe("recording-aware receive timing", () => {
     )
     await vi.advanceTimersByTimeAsync(1_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [2, 1, 0, 0], [[6, "ignored"]])
     expect(server.delivered).toBe(2)
     expect(csvEvents().filter((e) => e.event === "WS_RECV_END")).toHaveLength(3)
     expect(session.warnings).not.toHaveBeenCalled()
@@ -284,6 +336,7 @@ describe("recording-aware receive timing", () => {
     const session = startSession(recording([{ at: 0, message: update }], 0))
     await vi.advanceTimersByTimeAsync(30_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [0, 0, 0, 1], [[6, "mismatch"]])
     expect(server.delivered).toBe(1)
     expect(server.closed).toBe(1)
     expect(session.warnings).toHaveBeenCalledTimes(1)
@@ -316,6 +369,7 @@ describe("recording-aware receive timing", () => {
     )
     await vi.advanceTimersByTimeAsync(100_000)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [0, 0, 0, 1], [[6, "mismatch"]])
     const receiveEnd = csvEvents().find(
       (event) => event.event === "WS_RECV_END",
     )!
@@ -564,6 +618,7 @@ describe("recording-aware receive timing", () => {
     const session = startSession(recording([{ at: 0, message: "o" }], 0))
     await vi.advanceTimersByTimeAsync(0)
     expect(await session.result).toBe("done")
+    expectDiagnostics("done", [1, 0, 0, 0])
     expect(server.delivered).toBe(1)
     expect(session.warnings).not.toHaveBeenCalled()
   })
@@ -573,17 +628,29 @@ describe("recording-aware receive timing", () => {
     const session = startSession(recording([{ at: 0, message: "o" }], 0))
     await vi.advanceTimersByTimeAsync(0)
     expect(await session.result).toBe("failed")
+    expectDiagnostics("failed", [0, 0, 0, 0])
     expect(server.delivered).toBe(1)
     expect(server.closed).toBe(1)
   })
 
   it("fails promptly on server error during a receive", async () => {
-    server.schedule = [{ at: 5_000, error: true }]
+    server.schedule = [
+      { at: 0, message: update },
+      { at: 5_000, error: true },
+    ]
     const session = startSession(
-      recording([{ at: 50_000, message: update }], 50_000),
+      recording(
+        [
+          { at: 0, message: update },
+          { at: 0, message: ignored },
+          { at: 50_000, message: other },
+        ],
+        50_000,
+      ),
     )
     await vi.advanceTimersByTimeAsync(5_000)
     expect(await session.result).toBe("failed")
+    expectDiagnostics("failed", [1, 1, 0, 0], [[7, "ignored"]])
     expect(server.closed).toBe(1)
     expect(session.stats.getCounts()).toMatchObject({ failed: 1, done: 0 })
     expect(vi.getTimerCount()).toBe(0)
@@ -641,15 +708,24 @@ describe("recording-aware receive timing", () => {
   })
 
   it("cancels a pending receive and closes immediately", async () => {
+    server.schedule = [{ at: 0, message: update }]
     const controller = new AbortController()
     const session = startSession(
-      recording([{ at: 50_000, message: update }], 50_000),
+      recording(
+        [
+          { at: 0, message: update },
+          { at: 0, message: ignored },
+          { at: 50_000, message: other },
+        ],
+        50_000,
+      ),
       controller.signal,
     )
     await vi.advanceTimersByTimeAsync(5_000)
     controller.abort(new Error("test shutdown"))
     await vi.advanceTimersByTimeAsync(0)
     expect(await session.result).toBe("canceled")
+    expectDiagnostics("canceled", [1, 1, 0, 0], [[7, "ignored"]])
     expect(server.closed).toBe(1)
     expect(server.closedAt - epoch).toBe(5_000)
     expect(vi.getTimerCount()).toBe(0)

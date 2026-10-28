@@ -800,6 +800,12 @@ export async function runSession(
 
   let started = false
   let outcome: SessionOutcome = "failed"
+  const receiveCounts = {
+    wsRecvMatched: 0,
+    wsRecvIgnored: 0,
+    wsRecvTimeout: 0,
+    wsRecvMismatch: 0,
+  }
   diagnostics?.emit({ type: "session_start", ...diagnosticContext })
 
   try {
@@ -901,6 +907,26 @@ export async function runSession(
       )
 
       const receiveResult = await handleEvent(event, state)
+      if (receiveResult) {
+        if (receiveResult.reason === "matched") {
+          receiveCounts.wsRecvMatched++
+        } else {
+          const reason =
+            receiveResult.reason === "ignored" ||
+            receiveResult.reason === "timeout"
+              ? receiveResult.reason
+              : "mismatch"
+          if (reason === "ignored") receiveCounts.wsRecvIgnored++
+          else if (reason === "timeout") receiveCounts.wsRecvTimeout++
+          else receiveCounts.wsRecvMismatch++
+          diagnostics?.emit({
+            type: "ws_recv_skipped",
+            ...diagnosticContext,
+            inputLineNumber: receiveResult.line,
+            reason,
+          })
+        }
+      }
       if (receiveResult && receiveResult.reason !== "matched") {
         state.skippedReceive = true
       } else {
@@ -993,7 +1019,12 @@ export async function runSession(
       state.webSocket = null
     }
     writer.close()
-    diagnostics?.emit({ type: "session_end", ...diagnosticContext, outcome })
+    diagnostics?.emit({
+      type: "session_end",
+      ...diagnosticContext,
+      outcome,
+      ...receiveCounts,
+    })
   }
   return outcome
 }

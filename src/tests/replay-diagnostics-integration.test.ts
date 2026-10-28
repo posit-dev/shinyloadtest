@@ -302,10 +302,25 @@ describe("Replay diagnostics integration", () => {
   )
 
   it("flushes diagnostics before the built CLI exits, without exporting explicit headers", async () => {
-    const mock = new MockShinyServer()
+    const privateMessage = JSON.stringify({
+      values: { "private-output-key": "private-output-value" },
+      inputMessages: [],
+      errors: {},
+    })
+    const mock = new MockShinyServer({ wsRecvResponse: privateMessage })
     await mock.start()
     cleanups.push(() => mock.stop())
-    const config = setup(mock.makeRecording())
+    const recordingText = mock
+      .makeRecording()
+      .split("\n")
+      .map((line) => {
+        if (line.startsWith("#")) return line
+        const event = JSON.parse(line)
+        if (event.type === "WS_RECV") event.message = privateMessage
+        return JSON.stringify(event)
+      })
+      .join("\n")
+    const config = setup(recordingText)
     const env = replayEnvironment()
 
     await promisify(execFile)(
@@ -336,6 +351,29 @@ describe("Replay diagnostics integration", () => {
         expect.objectContaining({ type: "ws_closed", origin: "client" }),
       ]),
     )
+    const ends = recorded.filter((event) => event.type === "session_end")
+    const completed = ends.filter((event) => event.outcome === "done")
+    expect(completed.length).toBeGreaterThan(0)
+    for (const end of completed) {
+      expect(end).toMatchObject({
+        wsRecvMatched: 1,
+        wsRecvIgnored: 0,
+        wsRecvTimeout: 0,
+        wsRecvMismatch: 0,
+      })
+    }
+    for (const end of ends) {
+      expect(["done", "canceled"]).toContain(end.outcome)
+      expect([0, 1]).toContain(end.wsRecvMatched)
+      expect(end).toMatchObject({
+        wsRecvIgnored: 0,
+        wsRecvTimeout: 0,
+        wsRecvMismatch: 0,
+      })
+    }
+    expect(
+      recorded.filter((event) => event.type === "ws_recv_skipped"),
+    ).toEqual([])
     expect(recorded.at(-1)).toMatchObject({
       type: "run_end",
       activeSockets: 0,
@@ -346,6 +384,8 @@ describe("Replay diagnostics integration", () => {
       "utf8",
     )
     expect(diagnostics).not.toContain("cli-header-secret-sentinel")
+    expect(diagnostics).not.toContain("private-output-key")
+    expect(diagnostics).not.toContain("private-output-value")
     expect(diagnostics).not.toContain(mock.url)
   }, 15000)
 
@@ -381,7 +421,14 @@ describe("Replay diagnostics integration", () => {
           method: "GET",
           statusCode: 503,
         }),
-        expect.objectContaining({ type: "session_end", outcome: "failed" }),
+        expect.objectContaining({
+          type: "session_end",
+          outcome: "failed",
+          wsRecvMatched: 0,
+          wsRecvIgnored: 0,
+          wsRecvTimeout: 0,
+          wsRecvMismatch: 0,
+        }),
       ]),
     )
     const text = fs.readFileSync(
@@ -474,6 +521,18 @@ describe("Replay diagnostics integration", () => {
       activeSockets: 0,
       complete: true,
     })
+    expect(recorded.filter((event) => event.type === "session_end")).toEqual([
+      expect.objectContaining({
+        outcome: "done",
+        wsRecvMatched: 1,
+        wsRecvIgnored: 0,
+        wsRecvTimeout: 0,
+        wsRecvMismatch: 0,
+      }),
+    ])
+    expect(
+      recorded.filter((event) => event.type === "ws_recv_skipped"),
+    ).toEqual([])
     expect(recorded.filter((event) => event.type === "ws_closed")).toHaveLength(
       1,
     )

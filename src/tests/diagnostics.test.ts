@@ -119,7 +119,21 @@ describe("diagnostics event schema", () => {
 
     const events: DiagnosticEvent[] = [
       { type: "session_start", ...CONTEXT },
-      { type: "session_end", ...CONTEXT, outcome: "done" },
+      {
+        type: "session_end",
+        ...CONTEXT,
+        outcome: "done",
+        wsRecvMatched: 5,
+        wsRecvIgnored: 1,
+        wsRecvTimeout: 2,
+        wsRecvMismatch: 3,
+      },
+      ...(["ignored", "timeout", "mismatch"] as const).map((reason, i) => ({
+        type: "ws_recv_skipped" as const,
+        ...CONTEXT,
+        inputLineNumber: 10 + i,
+        reason,
+      })),
       {
         type: "http_complete",
         ...CONTEXT,
@@ -181,7 +195,25 @@ describe("diagnostics event schema", () => {
     const base = ["schemaVersion", "timestamp", "type"]
     const expected: Record<string, string[]> = {
       session_start: [...base, "sessionId", "workerId", "iterationId"],
-      session_end: [...base, "sessionId", "workerId", "iterationId", "outcome"],
+      session_end: [
+        ...base,
+        "sessionId",
+        "workerId",
+        "iterationId",
+        "outcome",
+        "wsRecvMatched",
+        "wsRecvIgnored",
+        "wsRecvTimeout",
+        "wsRecvMismatch",
+      ],
+      ws_recv_skipped: [
+        ...base,
+        "sessionId",
+        "workerId",
+        "iterationId",
+        "inputLineNumber",
+        "reason",
+      ],
       http_complete: [
         ...base,
         "sessionId",
@@ -236,6 +268,13 @@ describe("diagnostics event schema", () => {
       (line) => line.type !== "run_start" && line.type !== "run_end",
     )
     expect(outcomeEvents).toHaveLength(events.length)
+    expect(outcomeEvents).toEqual(
+      events.map((event) => ({
+        ...event,
+        schemaVersion: 1,
+        timestamp: expect.any(Number),
+      })),
+    )
 
     let seenRetryWithSession = false
     let seenRetryWithoutSession = false
@@ -285,6 +324,28 @@ describe("diagnostics event schema", () => {
       request: { body: "secret-sentinel" },
     }
     diagnostics.emit(tainted as unknown as DiagnosticEvent)
+    const extras = {
+      url: "http://app.example.com/secret-path",
+      payload: { secretKey: "secret-sentinel" },
+      error: "ECONNREFUSED secret-sentinel",
+    }
+    diagnostics.emit({
+      type: "session_end",
+      ...CONTEXT,
+      outcome: "done",
+      wsRecvMatched: 5,
+      wsRecvIgnored: 1,
+      wsRecvTimeout: 2,
+      wsRecvMismatch: 3,
+      ...extras,
+    } as DiagnosticEvent)
+    diagnostics.emit({
+      type: "ws_recv_skipped",
+      ...CONTEXT,
+      inputLineNumber: 42,
+      reason: "mismatch",
+      ...extras,
+    } as DiagnosticEvent)
     await diagnostics.finish()
 
     const lines = readLines(outputDir)
@@ -311,6 +372,26 @@ describe("diagnostics event schema", () => {
     expect(raw).not.toContain("api-key")
     expect(raw).not.toContain("ECONNREFUSED")
     expect(raw).not.toContain("Authorization")
+    expect(raw).not.toContain("secretKey")
+    expect(lines.find((line) => line.type === "session_end")).toEqual({
+      schemaVersion: 1,
+      timestamp: expect.any(Number),
+      type: "session_end",
+      ...CONTEXT,
+      outcome: "done",
+      wsRecvMatched: 5,
+      wsRecvIgnored: 1,
+      wsRecvTimeout: 2,
+      wsRecvMismatch: 3,
+    })
+    expect(lines.find((line) => line.type === "ws_recv_skipped")).toEqual({
+      schemaVersion: 1,
+      timestamp: expect.any(Number),
+      type: "ws_recv_skipped",
+      ...CONTEXT,
+      inputLineNumber: 42,
+      reason: "mismatch",
+    })
   })
 })
 

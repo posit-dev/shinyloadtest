@@ -102,14 +102,40 @@ outcome), HTTP requests split into `bootstrap` (authentication/session setup) an
 `playback` phases with method, status code, and duration, and an `aborted`
 flag on errors; the WebSocket lifecycle (`ws_created`, `ws_open`,
 `ws_close_requested`, `ws_error`, and `ws_closed` with close code and close
-origin); and `retry_wait` backoff delays. `run_start` records the shinyloadtest
-and Node.js versions and the worker/max-errors settings.
+origin); `ws_recv_skipped` receive classifications; and `retry_wait` backoff
+delays. `run_start` records the shinyloadtest and Node.js versions and the
+worker/max-errors settings.
 
-Only IDs, event types, status codes, durations, counts, and enum-like
-outcomes are written. No URLs, headers, cookies, request bodies, credentials,
-or free-form error messages can reach the file: each line is built from a
-per-event field whitelist, so extra properties are dropped even if a caller
-attaches them by mistake.
+For meaningful JSON `WS_RECV` events, replay allows the remaining recorded
+quiet interval plus 30 seconds of slack. Its deadline is at least 30 seconds
+and at most 15 minutes from the start of the receive; a match can finish
+earlier. A receive can also stop looking after 15 mismatched non-ignorable
+messages. Matching remains key-based, not a comparison of output values;
+buffered reordered messages can match later receives. Expected messages that
+are now ignorable are skipped. Essential protocol receives and exact
+string-frame matching retain their existing semantics. Replay is
+response-driven, so this policy does not
+enforce the recorded total duration, and very long gaps can exceed the cap.
+
+Each `session_end` includes counts for completed `WS_RECV` events:
+`wsRecvMatched` (including buffered and string matches), `wsRecvIgnored`
+(expected messages filtered as ignorable), `wsRecvTimeout` (no non-ignorable
+message arrived), and `wsRecvMismatch` (messages arrived but none matched
+before the deadline or mismatch limit). Incomplete receives on cancellation
+or failure are not counted. INIT and upload receives are not included.
+Each ignored, timeout, or mismatch result also produces a `ws_recv_skipped`
+event with its `reason` and numeric `inputLineNumber` in the recording.
+Ignored expectations are not degradation; a nonzero timeout or mismatch
+count indicates tolerated missing meaningful receives even if the outcome is
+`done`. Older schema version 1 files without these counts mean unknown, not
+zero.
+
+Only IDs, recording line numbers, event types, status codes, durations,
+counts, and enum-like outcomes are written. No URLs, headers, cookies, request
+or WebSocket bodies, message-derived identifiers, application JSON key names,
+credentials, or free-form error messages can reach the file: each line is
+built from a per-event field whitelist, so extra properties are dropped even
+if a caller attaches them by mistake.
 
 Things to know when reading the file:
 
@@ -137,7 +163,8 @@ concurrent CLI processes, collect one diagnostics file from each output
 directory and label them by recording and worker count. Keep the original
 workload settings and add `--diagnostics`; use a separate output directory
 for each process. Client “done” outcomes indicate completed playback, not
-verified app results or released server sessions.
+faithful replay, verified app results, or released server sessions. Check the
+receive counts and skip reasons before interpreting a completed session.
 
 To run a specific branch locally instead of an installed version:
 

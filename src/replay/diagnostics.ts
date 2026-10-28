@@ -60,7 +60,19 @@ export type WsCloseOrigin = "client" | "other"
 export type DiagnosticEvent =
   | { type: "run_start" }
   | ({ type: "session_start" } & DiagnosticContext)
-  | ({ type: "session_end"; outcome: SessionOutcome } & DiagnosticContext)
+  | ({
+      type: "session_end"
+      outcome: SessionOutcome
+      wsRecvMatched: number
+      wsRecvIgnored: number
+      wsRecvTimeout: number
+      wsRecvMismatch: number
+    } & DiagnosticContext)
+  | ({
+      type: "ws_recv_skipped"
+      inputLineNumber: number
+      reason: "ignored" | "timeout" | "mismatch"
+    } & DiagnosticContext)
   | ({
       type: "http_complete"
       phase: HttpPhase
@@ -130,7 +142,15 @@ const EVENT_FIELDS: Record<DiagnosticEvent["type"], readonly string[]> = {
   run_start: [],
   run_end: [],
   session_start: CONTEXT_FIELDS,
-  session_end: [...CONTEXT_FIELDS, "outcome"],
+  session_end: [
+    ...CONTEXT_FIELDS,
+    "outcome",
+    "wsRecvMatched",
+    "wsRecvIgnored",
+    "wsRecvTimeout",
+    "wsRecvMismatch",
+  ],
+  ws_recv_skipped: [...CONTEXT_FIELDS, "inputLineNumber", "reason"],
   http_complete: [
     ...CONTEXT_FIELDS,
     "phase",
