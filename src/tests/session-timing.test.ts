@@ -345,25 +345,28 @@ describe("recording-aware receive timing", () => {
     expect(csvEvents().map((event) => event.event)).toContain("PLAYBACK_DONE")
   })
 
-  it("allows fourteen mismatches before a matching message", async () => {
+  it("allows fifteen mismatches before a matching message", async () => {
     server.schedule = [
-      ...Array.from({ length: 14 }, () => ({ at: 0, message: other })),
+      ...Array.from({ length: 15 }, () => ({ at: 0, message: other })),
       { at: 1_000, message: update },
     ]
     const session = startSession(
       recording([{ at: 50_000, message: update }], 50_000),
     )
-    await vi.advanceTimersByTimeAsync(1_000)
+    await vi.advanceTimersByTimeAsync(60_000)
     expect(await session.result).toBe("done")
-    expect(server.delivered).toBe(15)
+    expectDiagnostics("done", [1, 0, 0, 0])
+    expect(server.delivered).toBe(16)
+    expect(server.closedAt - epoch).toBe(1_000)
     expect(session.warnings).not.toHaveBeenCalled()
   })
 
-  it("stops after fifteen mismatches and preserves residual close pacing", async () => {
-    server.schedule = Array.from({ length: 16 }, () => ({
-      at: 0,
-      message: other,
-    }))
+  it("stops after sixteen mismatches and preserves residual close pacing", async () => {
+    server.schedule = [
+      ...Array.from({ length: 15 }, () => ({ at: 0, message: other })),
+      { at: 1_000, message: other },
+      { at: 2_000, message: update },
+    ]
     const session = startSession(
       recording([{ at: 50_000, message: update }], 100_000),
     )
@@ -373,8 +376,8 @@ describe("recording-aware receive timing", () => {
     const receiveEnd = csvEvents().find(
       (event) => event.event === "WS_RECV_END",
     )!
-    expect(receiveEnd.time - epoch).toBe(0)
-    expect(server.delivered).toBe(16)
+    expect(receiveEnd.time - epoch).toBe(1_000)
+    expect(server.delivered).toBe(17)
     expect(server.closedAt - epoch).toBe(100_000)
     expect(session.warnings).toHaveBeenCalledTimes(1)
   })
@@ -518,6 +521,148 @@ describe("recording-aware receive timing", () => {
     expect(server.closedAt - epoch).toBe(100_000)
     expect(session.warnings).toHaveBeenCalledTimes(1)
   })
+
+  it("credits slow HTTP time toward the missing receive and residual close", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 20_000))
+        return new Response("ok", { status: 200 })
+      })
+    const base = recording([{ at: 50_000, message: update }], 100_000)
+    const rec: Recording = {
+      ...base,
+      events: [
+        ...base.events.slice(0, 2),
+        {
+          type: "REQ_GET",
+          begin: epoch,
+          lineNumber: 20,
+          url: "/synthetic",
+          status: 200,
+        },
+        ...base.events.slice(2),
+      ],
+    }
+    const session = startSession(rec)
+    await vi.advanceTimersByTimeAsync(125_000)
+    expect(await session.result).toBe("done")
+    expectDiagnostics("done", [0, 0, 1, 0], [[6, "timeout"]])
+    const events = csvEvents()
+    expect(
+      events.find((event) => event.event === "REQ_GET_START")!.time - epoch,
+    ).toBe(0)
+    expect(
+      events.find((event) => event.event === "REQ_GET_END")!.time - epoch,
+    ).toBe(20_000)
+    expect([
+      events.find((event) => event.event === "WS_RECV_END")!.time - epoch,
+      server.closedAt - epoch,
+    ]).toEqual([80_000, 100_000])
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(server.sent).toBe(1)
+    expect(server.delivered).toBe(0)
+    expect(server.closed).toBe(1)
+    expect(session.warnings).toHaveBeenCalledTimes(1)
+  })
+
+  it("still consumes a delayed update after slow HTTP", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 20_000))
+      return new Response("ok", { status: 200 })
+    })
+    server.schedule = [{ at: 70_000, message: update }]
+    const base = recording([{ at: 50_000, message: update }], 50_000)
+    const rec: Recording = {
+      ...base,
+      events: [
+        ...base.events.slice(0, 2),
+        {
+          type: "REQ_GET",
+          begin: epoch,
+          lineNumber: 20,
+          url: "/synthetic",
+          status: 200,
+        },
+        ...base.events.slice(2),
+      ],
+    }
+    const session = startSession(rec)
+    await vi.advanceTimersByTimeAsync(90_000)
+    expect(await session.result).toBe("done")
+    expectDiagnostics("done", [1, 0, 0, 0])
+    expect(server.delivered).toBe(1)
+    expect(server.closedAt - epoch).toBe(70_000)
+    expect(session.warnings).not.toHaveBeenCalled()
+  })
+
+  it("anchors a matched receive at its completion, not when waiting began", async () => {
+    server.schedule = [{ at: 50_000, message: update }]
+    const session = startSession(
+      recording(
+        [
+          { at: 50_000, message: update },
+          { at: 100_000, message: other },
+        ],
+        150_000,
+      ),
+    )
+    await vi.advanceTimersByTimeAsync(160_000)
+    expect(await session.result).toBe("done")
+    expectDiagnostics("done", [1, 0, 1, 0], [[7, "timeout"]])
+    const receives = csvEvents().filter(
+      (event) => event.event === "WS_RECV_END",
+    )
+    expect(receives.map((event) => event.time - epoch)).toEqual([
+      50_000, 130_000,
+    ])
+    expect(server.delivered).toBe(1)
+    expect(server.closedAt - epoch).toBe(150_000)
+  })
+
+  it.each([
+    { type: "WS_RECV" as const, message: "o", matched: 1 },
+    {
+      type: "WS_RECV_INIT" as const,
+      message: JSON.stringify({ config: { sessionId: "synthetic" } }),
+      matched: 0,
+    },
+    {
+      type: "WS_RECV_BEGIN_UPLOAD" as const,
+      message: JSON.stringify({ response: { value: { jobId: "synthetic" } } }),
+      matched: 0,
+    },
+  ])(
+    "anchors $type at its successful completion",
+    async ({ type, message, matched }) => {
+      server.schedule = [{ at: 20_000, message }]
+      const base = recording([{ at: 70_000, message: update }], 120_000)
+      const rec: Recording = {
+        ...base,
+        events: [
+          ...base.events.slice(0, 2),
+          { type, begin: epoch + 20_000, lineNumber: 20, message },
+          ...base.events.slice(2),
+        ],
+      }
+      const session = startSession(rec)
+      await vi.advanceTimersByTimeAsync(130_000)
+      expect(await session.result).toBe("done")
+      expectDiagnostics("done", [matched, 0, 1, 0], [[6, "timeout"]])
+      const events = csvEvents()
+      expect(
+        events.find(
+          (event) => event.line === 20 && event.event?.endsWith("_END"),
+        )!.time - epoch,
+      ).toBe(20_000)
+      expect(
+        events.find(
+          (event) => event.line === 6 && event.event === "WS_RECV_END",
+        )!.time - epoch,
+      ).toBe(100_000)
+      expect(server.closedAt - epoch).toBe(120_000)
+    },
+  )
 
   it("waits for a delayed message after an earlier missing event", async () => {
     server.schedule = [{ at: 65_000, message: update }]
@@ -673,7 +818,7 @@ describe("recording-aware receive timing", () => {
 
   it("interrupts residual pacing when the server fails", async () => {
     server.schedule = [
-      ...Array.from({ length: 15 }, () => ({ at: 0, message: other })),
+      ...Array.from({ length: 16 }, () => ({ at: 0, message: other })),
       { at: 5_000, error: true },
     ]
     const session = startSession(
@@ -690,7 +835,7 @@ describe("recording-aware receive timing", () => {
   })
 
   it("cancels residual pacing and closes promptly", async () => {
-    server.schedule = Array.from({ length: 15 }, () => ({
+    server.schedule = Array.from({ length: 16 }, () => ({
       at: 0,
       message: other,
     }))

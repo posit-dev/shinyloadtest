@@ -109,10 +109,12 @@ worker/max-errors settings.
 For meaningful JSON `WS_RECV` events, replay allows the remaining recorded
 quiet interval plus 30 seconds of slack. Its deadline is at least 30 seconds
 and at most 15 minutes from the start of the receive; a match can finish
-earlier. A receive can also stop looking after 15 mismatched non-ignorable
+earlier. A receive can also stop looking after 16 mismatched non-ignorable
 messages. Matching remains key-based, not a comparison of output values;
 buffered reordered messages can match later receives. Expected messages that
-are now ignorable are skipped. Essential protocol receives and exact
+are now ignorable are skipped. After a skipped or ignored receive, residual
+pacing before the next send, open-socket GET, or close is also capped at 15
+minutes. Ordinary pacing is unchanged. Essential protocol receives and exact
 string-frame matching retain their existing semantics. Replay is
 response-driven, so this policy does not
 enforce the recorded total duration, and very long gaps can exceed the cap.
@@ -125,10 +127,12 @@ before the deadline or mismatch limit). Incomplete receives on cancellation
 or failure are not counted. INIT and upload receives are not included.
 Each ignored, timeout, or mismatch result also produces a `ws_recv_skipped`
 event with its `reason` and numeric `inputLineNumber` in the recording.
-Ignored expectations are not degradation; a nonzero timeout or mismatch
-count indicates tolerated missing meaningful receives even if the outcome is
-`done`. Older schema version 1 files without these counts mean unknown, not
-zero.
+There is one event per ignored expectation, so older recordings with many
+ignorable messages can produce larger logs; use the per-session counts for
+summaries. Ignored expectations are not degradation; a nonzero timeout or
+mismatch count indicates tolerated missing meaningful receives even if the
+outcome is `done`. Older schema version 1 files without these counts mean
+unknown, not zero.
 
 Only IDs, recording line numbers, event types, status codes, durations,
 counts, and enum-like outcomes are written. No URLs, headers, cookies, request

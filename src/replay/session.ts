@@ -244,7 +244,7 @@ const WS_RECV_MAX_GAP_MS = 15 * 60_000
 const WS_RECV_SLACK_MS = 30_000
 
 /** Maximum mismatched messages buffered while looking for one receive. */
-const WS_RECV_MISMATCH_LIMIT = 15
+const WS_RECV_MISMATCH_LIMIT = 16
 
 interface TimingAnchor {
   recorded: number
@@ -252,14 +252,9 @@ interface TimingAnchor {
   actual: number
 }
 
-// Safe, payload-free result for the diagnostics follow-up.
+// Payload-free receive classification used by timing and diagnostics.
 type ReceiveResult = {
-  reason:
-    | "matched"
-    | "ignored"
-    | "timeout"
-    | "mismatch_timeout"
-    | "mismatch_limit"
+  reason: "matched" | "ignored" | "timeout" | "mismatch"
   line: number
 }
 
@@ -601,13 +596,7 @@ async function handleWsRecv(
   state.logger.warn(
     `WS_RECV line ${event.lineNumber}: expected [${expectingKeys}] but no match found after lookahead, continuing`,
   )
-  return {
-    reason:
-      mismatches === WS_RECV_MISMATCH_LIMIT
-        ? "mismatch_limit"
-        : "mismatch_timeout",
-    line: event.lineNumber,
-  }
+  return { reason: "mismatch", line: event.lineNumber }
 }
 
 /** Receive the next non-ignorable message from the WebSocket. */
@@ -906,33 +895,33 @@ export async function runSession(
         "",
       )
 
+      const handlerStartedAt = performance.now()
       const receiveResult = await handleEvent(event, state)
-      if (receiveResult) {
-        if (receiveResult.reason === "matched") {
-          receiveCounts.wsRecvMatched++
-        } else {
-          const reason =
-            receiveResult.reason === "ignored" ||
-            receiveResult.reason === "timeout"
-              ? receiveResult.reason
-              : "mismatch"
-          if (reason === "ignored") receiveCounts.wsRecvIgnored++
-          else if (reason === "timeout") receiveCounts.wsRecvTimeout++
-          else receiveCounts.wsRecvMismatch++
-          diagnostics?.emit({
-            type: "ws_recv_skipped",
-            ...diagnosticContext,
-            inputLineNumber: receiveResult.line,
-            reason,
-          })
-        }
-      }
+      const handlerEndedAt = performance.now()
       if (receiveResult && receiveResult.reason !== "matched") {
+        const reason = receiveResult.reason
+        if (reason === "ignored") receiveCounts.wsRecvIgnored++
+        else if (reason === "timeout") receiveCounts.wsRecvTimeout++
+        else receiveCounts.wsRecvMismatch++
+        diagnostics?.emit({
+          type: "ws_recv_skipped",
+          ...diagnosticContext,
+          inputLineNumber: receiveResult.line,
+          reason,
+        })
         state.skippedReceive = true
       } else {
+        if (receiveResult) receiveCounts.wsRecvMatched++
         state.timingAnchor = {
           recorded: event.begin,
-          actual: performance.now(),
+          // Recorded receives represent arrivals; other event timestamps mark
+          // handler starts, so their execution time counts toward the gap.
+          actual:
+            event.type === "WS_RECV" ||
+            event.type === "WS_RECV_INIT" ||
+            event.type === "WS_RECV_BEGIN_UPLOAD"
+              ? handlerEndedAt
+              : handlerStartedAt,
         }
         state.skippedReceive = false
       }
