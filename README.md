@@ -105,9 +105,8 @@ flag on errors; the WebSocket lifecycle (`ws_created`, `ws_open`,
 origin); `ws_recv_skipped` receive classifications; `ws_recv_waiting` for an
 essential protocol receive that is still waiting, repeated once per 30-second
 poll with the recording line, the frame type, and the cumulative wait; and
-`retry_wait` backoff
-delays. `run_start` records the shinyloadtest and Node.js versions and the
-worker/max-errors settings.
+`retry_wait` backoff delays. `run_start` records the shinyloadtest and Node.js
+versions and the worker/max-errors settings.
 
 For meaningful JSON `WS_RECV` events, replay allows the remaining recorded
 quiet interval plus 30 seconds of slack. Its deadline is at least 30 seconds
@@ -171,10 +170,10 @@ Things to know when reading the file:
 - A session waiting for an essential protocol message shows it in the log: a
   `ws_recv_waiting` event per poll interval, with a rising `waitedMs`, until
   the message arrives or the session is cancelled. While it waits, the console
-  repeats a warning naming the
-  recording line every 30 seconds, and after 10 minutes the warning becomes an
-  error. If the console output was not captured, a session whose last event is
-  `ws_recv_waiting` was stuck on that frame, not slow somewhere else.
+  repeats a warning naming the recording line every 30 seconds, and after 10
+  minutes the warning becomes an error. If the console output was not captured,
+  a session whose last event is `ws_recv_waiting` was stuck on that frame, not
+  slow somewhere else.
 - On an orderly finish, `run_end` is the last line, with `activeSockets`
   (WebSockets that never reported closure within the wait window) and a
   `complete` flag. Ctrl+C or `SIGTERM` exits immediately: a file with no
