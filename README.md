@@ -80,6 +80,14 @@ is omitted, the target URL from the recording file is used.
 | `--diagnostics` | Write a credential-free diagnostics event log (`diagnostics.jsonl`) to the output directory (default: off) |
 | `--log-level <level>` | Console log level: `debug`, `info`, `warn`, `error` (default: `warn`) |
 
+Header values that look like credentials — a case-insensitive name containing
+`authorization`, `cookie`, `token`, `secret`, `password`, `passwd`, `api-key`,
+`apikey`, or `credential` — are written as `[REDACTED]` in the session CSV
+metadata. Replay still sends the real values. Redaction covers the files only:
+`-H` values stay in the process argument list while the run lasts, so on a
+shared machine pass secrets through `SHINYLOADTEST_CONNECT_API_KEY`,
+`SHINYLOADTEST_USER`, or `SHINYLOADTEST_PASS` instead.
+
 When a session fails, its worker waits before retrying: about 1s after the
 first failure, doubling per consecutive failure up to 30s, with ±25% jitter
 so workers that fail together don't retry in lockstep. A successful session
@@ -126,10 +134,12 @@ released a session, and a `done` outcome means playback completed, not that
 the app rendered the right thing. Check the receive counts and skip reasons
 before trusting a session that looks clean.
 
-> **Don't share the session CSVs.** Each one embeds the command line used for
-> the run as a comment header, including any `-H` header values (typically an
-> API key). `--debug-log` records full WebSocket payloads; treat that file as
-> application data, not as something to post publicly.
+> **Session CSVs are not safe to share as-is.** Each one embeds the command
+> line used for the run as a comment header — the app URL, output paths, and
+> any non-credential `-H` values. Credential-looking header values are
+> `[REDACTED]`, but the rest of the invocation is not. `--debug-log` records
+> full WebSocket payloads; treat that file as application data, not as
+> something to post publicly.
 
 ## Report
 

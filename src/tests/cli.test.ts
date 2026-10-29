@@ -4,6 +4,9 @@ import * as path from "node:path"
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest"
 import {
   parseHeader,
+  redactSensitiveHeaders,
+  isSensitiveHeaderName,
+  REDACTED_HEADER_VALUE,
   serializeArgs,
   parseArgs,
   type ParsedArgs,
@@ -34,6 +37,59 @@ describe("parseHeader", () => {
 
   it("throws when header name is empty", () => {
     expect(() => parseHeader(": no-name")).toThrow("Header name is empty")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Header redaction
+// ---------------------------------------------------------------------------
+
+describe("isSensitiveHeaderName", () => {
+  it.each([
+    "Authorization",
+    "authorization",
+    "AUTHORIZATION",
+    "Proxy-Authorization",
+    "Cookie",
+    "X-Api-Key",
+    "x-api-key",
+    "X-Auth-Token",
+    "X-Client-Secret",
+    "credential",
+  ])("treats %s as sensitive", (name) => {
+    expect(isSensitiveHeaderName(name)).toBe(true)
+  })
+
+  it.each(["X-Test", "Accept", "Content-Type", "X-Request-Id"])(
+    "treats %s as safe",
+    (name) => {
+      expect(isSensitiveHeaderName(name)).toBe(false)
+    },
+  )
+})
+
+describe("redactSensitiveHeaders", () => {
+  it("replaces sensitive values and keeps the rest", () => {
+    expect(
+      redactSensitiveHeaders({
+        Authorization: "Key abc",
+        "X-Test": "visible",
+      }),
+    ).toEqual({
+      Authorization: REDACTED_HEADER_VALUE,
+      "X-Test": "visible",
+    })
+  })
+
+  it("returns a copy rather than mutating the input", () => {
+    const headers = { authorization: "Bearer value" }
+    const redacted = redactSensitiveHeaders(headers)
+    expect(redacted).not.toBe(headers)
+    expect(headers.authorization).toBe("Bearer value")
+  })
+
+  it("handles an empty header set", () => {
+    expect(redactSensitiveHeaders({})).toEqual({})
   })
 })
 
@@ -95,11 +151,60 @@ describe("serializeArgs", () => {
   it("includes -H entries for headers", () => {
     const { argsString } = serializeArgs(
       makeArgs({
-        headers: { "X-Custom": "value1", Authorization: "Bearer tok" },
+        headers: { "X-Custom": "value1", "X-Other": "value2" },
       }),
     )
     expect(argsString).toContain('-H "X-Custom: value1"')
-    expect(argsString).toContain('-H "Authorization: Bearer tok"')
+    expect(argsString).toContain('-H "X-Other: value2"')
+  })
+
+  it.each(["Authorization", "authorization", "AUTHORIZATION"])(
+    "redacts %s values in argsString and argsJson",
+    (name) => {
+      const args = makeArgs({ headers: { [name]: "Key super-secret" } })
+      const { argsString, argsJson } = serializeArgs(args)
+
+      expect(argsString).toContain(`-H "${name}: ${REDACTED_HEADER_VALUE}"`)
+      expect(argsString).not.toContain("super-secret")
+      expect(JSON.parse(argsJson).headers[name]).toBe(REDACTED_HEADER_VALUE)
+      expect(argsJson).not.toContain("super-secret")
+    },
+  )
+
+  it.each([
+    "Cookie",
+    "Proxy-Authorization",
+    "X-Api-Key",
+    "X-Client-Secret",
+    "X-Auth-Token",
+  ])("redacts credential-bearing header %s", (name) => {
+    const { argsString, argsJson } = serializeArgs(
+      makeArgs({ headers: { [name]: "sensitive-value" } }),
+    )
+    expect(argsString).not.toContain("sensitive-value")
+    expect(argsJson).not.toContain("sensitive-value")
+    expect(JSON.parse(argsJson).headers[name]).toBe(REDACTED_HEADER_VALUE)
+  })
+
+  it("keeps non-sensitive header values readable", () => {
+    const parsed = JSON.parse(
+      serializeArgs(
+        makeArgs({
+          headers: { "X-Test": "plain-value", Authorization: "Key k" },
+        }),
+      ).argsJson,
+    )
+    expect(parsed.headers).toEqual({
+      "X-Test": "plain-value",
+      Authorization: REDACTED_HEADER_VALUE,
+    })
+  })
+
+  it("does not modify the parsed args headers", () => {
+    // Replay sends args.headers on every request; redaction is metadata-only.
+    const headers = { Authorization: "Key real-key" }
+    serializeArgs(makeArgs({ headers }))
+    expect(headers.Authorization).toBe("Key real-key")
   })
 
   it("includes --diagnostics in argsString only when true", () => {

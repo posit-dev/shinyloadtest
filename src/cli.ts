@@ -49,13 +49,80 @@ export function parseHeader(header: string): [string, string] {
 }
 
 // ---------------------------------------------------------------------------
+// Header redaction for persisted metadata
+// ---------------------------------------------------------------------------
+
+/**
+ * Placeholder written in persisted metadata in place of a sensitive header
+ * value.
+ */
+export const REDACTED_HEADER_VALUE = "[REDACTED]"
+
+/**
+ * Lowercased name fragments that mark a header as a credential carrier.
+ * Substring matching is deliberate: `Authorization`, `authorization`, and
+ * `Proxy-Authorization` all match, as do vendor spellings such as `X-Api-Key`
+ * or `X-Client-Secret` that an exact-name list would miss. A false positive
+ * only costs a redacted value in metadata nobody parses; a false negative
+ * writes a live credential to disk.
+ */
+const SENSITIVE_HEADER_NAME_FRAGMENTS = [
+  "authorization",
+  "cookie",
+  "token",
+  "secret",
+  "password",
+  "passwd",
+  "api-key",
+  "apikey",
+  "credential",
+] as const
+
+/**
+ * Whether a header name is treated as carrying a credential. Case-insensitive.
+ */
+export function isSensitiveHeaderName(name: string): boolean {
+  const lower = name.toLowerCase()
+  return SENSITIVE_HEADER_NAME_FRAGMENTS.some((fragment) =>
+    lower.includes(fragment),
+  )
+}
+
+/**
+ * Copy `headers` with sensitive values replaced by `REDACTED_HEADER_VALUE`.
+ * The input object is not modified: replay still sends the real values.
+ */
+export function redactSensitiveHeaders(
+  headers: Record<string, string>,
+): Record<string, string> {
+  const redacted: Record<string, string> = {}
+  for (const [name, value] of Object.entries(headers)) {
+    redacted[name] = isSensitiveHeaderName(name) ? REDACTED_HEADER_VALUE : value
+  }
+  return redacted
+}
+
+// ---------------------------------------------------------------------------
 // Serialize args for output files
 // ---------------------------------------------------------------------------
 
+/**
+ * Render the replay invocation for the session CSV metadata comments.
+ *
+ * Header values that carry credentials are redacted here, not in the parsed
+ * args: the session files are long-lived artifacts that users share with
+ * reports, while the live request headers must stay intact. Redaction hides
+ * values from the files only. It does not remove `-H` values from the OS
+ * process list, where argv is visible to other local users; pass secrets
+ * through `SHINYLOADTEST_CONNECT_API_KEY` (or the auth environment
+ * variables) when that matters.
+ */
 export function serializeArgs(args: ParsedArgs): {
   argsString: string
   argsJson: string
 } {
+  const headers = redactSensitiveHeaders(args.headers)
+
   const parts: string[] = [
     args.appUrl,
     `--workers ${args.workers}`,
@@ -67,7 +134,7 @@ export function serializeArgs(args: ParsedArgs): {
   if (args.maxErrors !== null) {
     parts.push(`--max-errors ${args.maxErrors}`)
   }
-  for (const [name, value] of Object.entries(args.headers)) {
+  for (const [name, value] of Object.entries(headers)) {
     parts.push(`-H "${name}: ${value}"`)
   }
   parts.push(`--output-dir ${args.outputDir}`)
@@ -90,7 +157,7 @@ export function serializeArgs(args: ParsedArgs): {
     loadedDurationMinutes: args.loadedDurationMinutes,
     startInterval: args.startInterval,
     maxErrors: args.maxErrors,
-    headers: args.headers,
+    headers,
     outputDir: args.outputDir,
     overwriteOutput: args.overwriteOutput,
     debugLog: args.debugLog,
