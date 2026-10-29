@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
+import { withTeardown } from "./helpers/teardown.js"
 
 const MAIN_JS = path.resolve("dist/main.mjs")
 const FAKE_URL = "http://127.0.0.1:65535"
@@ -253,56 +254,59 @@ describe.each(["SHINYLOADTEST_CONNECT_API_KEY", "SHINYCANNON_CONNECT_API_KEY"])(
       const tmpDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "shinyloadtest-replay-cli-"),
       )
-      try {
-        const recordingPath = path.join(tmpDir, "recording.log")
-        fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
-        const outputDir = path.join(tmpDir, "output")
+      await withTeardown(
+        async () => {
+          const recordingPath = path.join(tmpDir, "recording.log")
+          fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
+          const outputDir = path.join(tmpDir, "output")
 
-        const result = await runCli(
-          replayArgs(recordingPath, mock.url, outputDir),
-          { [envVar]: FAKE_API_KEY },
-          60000,
-        )
+          const result = await runCli(
+            replayArgs(recordingPath, mock.url, outputDir),
+            { [envVar]: FAKE_API_KEY },
+            60000,
+          )
 
-        expect(result.exitCode).toBe(0)
+          expect(result.exitCode).toBe(0)
 
-        expect(mock.httpRequests.length).toBeGreaterThan(0)
-        for (const headers of mock.httpRequests) {
-          expect(headers).toMatchObject({
-            authorization: `Key ${FAKE_API_KEY}`,
-            "x-test": CUSTOM_HEADER_VALUE,
-          })
-        }
+          expect(mock.httpRequests.length).toBeGreaterThan(0)
+          for (const headers of mock.httpRequests) {
+            expect(headers).toMatchObject({
+              authorization: `Key ${FAKE_API_KEY}`,
+              "x-test": CUSTOM_HEADER_VALUE,
+            })
+          }
 
-        expect(mock.wsRequests.length).toBeGreaterThanOrEqual(1)
-        for (const headers of mock.wsRequests) {
-          expect(headers).toMatchObject({
-            authorization: `Key ${FAKE_API_KEY}`,
-            "x-test": CUSTOM_HEADER_VALUE,
-          })
-          expect(headers.cookie).toContain("rscid=mock-connect-session")
-        }
+          expect(mock.wsRequests.length).toBeGreaterThanOrEqual(1)
+          for (const headers of mock.wsRequests) {
+            expect(headers).toMatchObject({
+              authorization: `Key ${FAKE_API_KEY}`,
+              "x-test": CUSTOM_HEADER_VALUE,
+            })
+            expect(headers.cookie).toContain("rscid=mock-connect-session")
+          }
 
-        const sessionsDir = path.join(outputDir, "sessions")
-        const csvNames = fs
-          .readdirSync(sessionsDir)
-          .filter((name) => name.endsWith(".csv"))
-        expect(csvNames.length).toBeGreaterThan(0)
-        const csvs = csvNames.map((name) =>
-          fs.readFileSync(path.join(sessionsDir, name), "utf-8"),
-        )
-        expect(csvs.join("\n")).toContain("PLAYBACK_DONE")
+          const sessionsDir = path.join(outputDir, "sessions")
+          const csvNames = fs
+            .readdirSync(sessionsDir)
+            .filter((name) => name.endsWith(".csv"))
+          expect(csvNames.length).toBeGreaterThan(0)
+          const csvs = csvNames.map((name) =>
+            fs.readFileSync(path.join(sessionsDir, name), "utf-8"),
+          )
+          expect(csvs.join("\n")).toContain("PLAYBACK_DONE")
 
-        const allOutput = [
-          ...collectFileContents(outputDir),
-          result.stdout,
-          result.stderr,
-        ].join("\n")
-        expect(allOutput).not.toContain(FAKE_API_KEY)
-      } finally {
-        await mock.stop()
-        fs.rmSync(tmpDir, { recursive: true, force: true })
-      }
+          const allOutput = [
+            ...collectFileContents(outputDir),
+            result.stdout,
+            result.stderr,
+          ].join("\n")
+          expect(allOutput).not.toContain(FAKE_API_KEY)
+        },
+        async () => {
+          await mock.stop()
+          fs.rmSync(tmpDir, { recursive: true, force: true })
+        },
+      )
     }, 60000)
   },
 )
@@ -315,26 +319,29 @@ describe("CLI Process replay with invalid Connect API key", () => {
     const tmpDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "shinyloadtest-invalid-key-"),
     )
-    try {
-      const recordingPath = path.join(tmpDir, "recording.log")
-      fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
-      const outputDir = path.join(tmpDir, "output")
+    await withTeardown(
+      async () => {
+        const recordingPath = path.join(tmpDir, "recording.log")
+        fs.writeFileSync(recordingPath, mock.makeRecording(), "utf-8")
+        const outputDir = path.join(tmpDir, "output")
 
-      const result = await runCli(
-        replayArgs(recordingPath, mock.url, outputDir),
-        { SHINYLOADTEST_CONNECT_API_KEY: "wrong-key-value" },
-        60000,
-      )
+        const result = await runCli(
+          replayArgs(recordingPath, mock.url, outputDir),
+          { SHINYLOADTEST_CONNECT_API_KEY: "wrong-key-value" },
+          60000,
+        )
 
-      expect(result.exitCode).not.toBe(0)
+        expect(result.exitCode).not.toBe(0)
 
-      expect(mock.httpRequests).toHaveLength(1)
-      expect(mock.httpRequests[0]?.authorization).toMatch(/^Key /)
-      expect(result.stderr).toContain("HTTP 401")
-      expect(mock.wsRequests).toHaveLength(0)
-    } finally {
-      await mock.stop()
-      fs.rmSync(tmpDir, { recursive: true, force: true })
-    }
+        expect(mock.httpRequests).toHaveLength(1)
+        expect(mock.httpRequests[0]?.authorization).toMatch(/^Key /)
+        expect(result.stderr).toContain("HTTP 401")
+        expect(mock.wsRequests).toHaveLength(0)
+      },
+      async () => {
+        await mock.stop()
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      },
+    )
   }, 60000)
 })
