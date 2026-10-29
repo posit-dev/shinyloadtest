@@ -126,7 +126,7 @@ messages and URLs, so the session cannot continue without them. They have no
 fixed deadline either — a cold app start can be slow, and failing a session
 that would have recovered only adds retry load. They wait for the message,
 logging a warning with the recording line every 30 seconds, and are bounded by
-the end of the run rather than by a timer: the loaded-duration expiry,
+the run's end conditions rather than by a timer: the loaded-duration expiry,
 `--max-errors` once other sessions have failed, and Ctrl+C. Warmup is the
 exception: the loaded-duration timer starts only after every worker's first
 session has finished, so a run in which all workers are waiting for a required
