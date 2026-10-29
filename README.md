@@ -119,16 +119,16 @@ string-frame matching retain their existing semantics. Replay is
 response-driven, so this policy does not
 enforce the recorded total duration, and very long gaps can exceed the cap.
 
-Essential protocol receives cannot be skipped: the session ID and upload job
-ID they carry (`WS_RECV_INIT`, `WS_RECV_BEGIN_UPLOAD`, and the SockJS open
-frame matched by an exact string `WS_RECV`) are substituted into later
-messages and URLs, so the session cannot continue without them. They have no
-fixed deadline either — a cold app start can be slow, and failing a session
-that would have recovered only adds retry load. They wait for the message,
-logging a warning with the recording line every 30 seconds, and are bounded by
-the run's end conditions rather than by a timer: the loaded-duration expiry,
-`--max-errors` once other sessions have failed, and Ctrl+C. Warmup is the
-exception: the loaded-duration timer starts only after every worker's first
+Essential protocol receives cannot be skipped: `WS_RECV_INIT` and
+`WS_RECV_BEGIN_UPLOAD` carry the session ID and upload job ID that are
+substituted into later messages and URLs, and the SockJS open frame is matched
+as an exact string, so a session cannot continue without any of them. They
+have no fixed deadline either — a cold app start can be slow, and failing a
+session that would have recovered only adds retry load. They wait for the
+message, logging a warning with the recording line every 30 seconds, and are
+bounded by the run's end conditions rather than by a timer: the loaded-duration
+expiry, `--max-errors` once other sessions have failed, and Ctrl+C. Warmup is
+the exception: the loaded-duration timer starts only after every worker's first
 session has finished, so a run in which all workers are waiting for a required
 message at that point does not end on its own.
 
