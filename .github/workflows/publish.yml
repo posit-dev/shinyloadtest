@@ -3,6 +3,15 @@ name: publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag or commit to publish (for example v2.0.0-alpha.7)
+        required: true
+      promote_latest:
+        description: Point the `latest` dist-tag at this version after publishing
+        type: boolean
+        default: false
 
 concurrency:
   group: publish
@@ -17,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -36,6 +47,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -67,9 +80,37 @@ jobs:
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
+      # Publishing is not idempotent: a release whose first package published
+      # but whose stub failed cannot be re-run, because npm rejects republishing
+      # an existing version. Skip versions that are already on the registry so
+      # the job can be safely retried.
       - name: Publish shinyloadtest
-        run: npm publish --access public --provenance --tag ${{ steps.tag.outputs.npm_tag }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "shinyloadtest@$version" version >/dev/null 2>&1; then
+            echo "shinyloadtest@$version is already published; nothing to do"
+          else
+            npm publish --access public --provenance --tag ${{ steps.tag.outputs.npm_tag }}
+          fi
 
       - name: Publish shinycannon stub
         working-directory: packages/shinycannon
-        run: npm publish --access public --provenance --tag ${{ steps.tag.outputs.npm_tag }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "shinycannon@$version" version >/dev/null 2>&1; then
+            echo "shinycannon@$version is already published; nothing to do"
+          else
+            npm publish --access public --provenance --tag ${{ steps.tag.outputs.npm_tag }}
+          fi
+
+      # `latest` is normally only set by the release's own dist-tag. Expose it
+      # as an explicit dispatch input so an existing version can be promoted
+      # without a local npm login, using the trusted publisher's dist-tag
+      # permission (requires npm >= 11.21.0, which the step above pins).
+      - name: Promote latest dist-tag
+        if: inputs.promote_latest
+        run: |
+          version=$(node -p "require('./package.json').version")
+          stub_version=$(node -p "require('./packages/shinycannon/package.json').version")
+          npm dist-tag add "shinyloadtest@$version" latest
+          npm dist-tag add "shinycannon@$stub_version" latest
