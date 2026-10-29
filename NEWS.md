@@ -40,6 +40,11 @@ published as `shinyloadtest` on npm.
   lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, and
   retry delays. No URLs, headers, credentials, or error strings are recorded.
 
+* The `shinycannon` stub package now pins the exact matching `shinyloadtest`
+  version instead of a caret range. With a range, `npx shinycannon` could
+  resolve to whichever version the `latest` npm tag pointed at, so it could run
+  an older `shinyloadtest` than the version it reported.
+
 * The recording format, output format, and analysis workflows with the
   shinyloadtest R package are fully compatible with previous versions.
 
