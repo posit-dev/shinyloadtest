@@ -135,6 +135,11 @@ export interface SessionConfig {
    * matching `null` is what a stalled session is stalled on.
    */
   onRequiredReceiveWait?: (wait: RequiredReceiveWait | null) => void
+  /**
+   * Shortens the receive poll interval so tests can observe the wait cadence
+   * without waiting 30 seconds. Production uses the default.
+   */
+  receivePollTimeoutMs?: number
 }
 
 /** A required protocol receive this session is currently waiting on. */
@@ -311,6 +316,7 @@ interface SessionState {
   timingAnchor: TimingAnchor | null
   skippedReceive: boolean
   onRequiredReceiveWait: ((wait: RequiredReceiveWait | null) => void) | null
+  receivePollTimeoutMs: number | undefined
 }
 
 function replaceSessionTokens(
@@ -437,6 +443,7 @@ async function handleWsOpen(
   const ws = new ShinyWebSocket({
     url: wsUrl,
     headers: wsHeaders,
+    pollTimeoutMs: state.receivePollTimeoutMs,
     diagnostics: state.diagnostics
       ? { writer: state.diagnostics, context: state.diagnosticContext }
       : undefined,
@@ -639,6 +646,21 @@ function requiredReceiveWaiting(
       state.logger.error(message)
     } else {
       state.logger.warn(message)
+    }
+
+    // A wait leaves no other trace in the log: record each poll interval so a
+    // stalled session is visible in diagnostics.jsonl, not only on a console
+    // nobody captured.
+    const socketId = state.webSocket?.socketId ?? null
+    if (state.diagnostics !== undefined && socketId !== null) {
+      state.diagnostics.emit({
+        type: "ws_recv_waiting",
+        ...state.diagnosticContext,
+        socketId,
+        inputLineNumber: event.lineNumber,
+        eventType: event.type,
+        waitedMs: Math.round(elapsedSeconds * 1000),
+      })
     }
   }
 }
@@ -855,6 +877,7 @@ export async function runSession(
     timingAnchor: null,
     skippedReceive: false,
     onRequiredReceiveWait: config.onRequiredReceiveWait ?? null,
+    receivePollTimeoutMs: config.receivePollTimeoutMs,
   }
 
   let started = false

@@ -544,3 +544,104 @@ describe("Replay diagnostics integration", () => {
     expect(text).not.toContain(mock.url)
   })
 })
+
+describe("waiting required receives", () => {
+  it("records each poll interval so a stalled session is not just a ws_open", async () => {
+    // The application opens the socket and never sends its config, so the
+    // session cannot continue: the case that used to leave diagnostics.jsonl
+    // ending at ws_open with no explanation.
+    const mock = new MockShinyServer({ wsNoInit: true })
+    await mock.start()
+    cleanups.push(() => mock.stop())
+
+    const config = setup(mock.makeRecording())
+    const diagnostics = new ReplayDiagnostics({
+      outputDir: config.outputDir,
+      numWorkers: 1,
+      maxErrors: 0,
+    })
+    cleanups.push(() => diagnostics.finish())
+
+    const controller = new AbortController()
+    const session = runSession(
+      {
+        ...config,
+        httpUrl: mock.url,
+        headers: {},
+        creds: { user: null, pass: null, connectApiKey: null },
+        diagnostics,
+        signal: controller.signal,
+        // 40ms polls instead of 30s: the cadence is what matters here, not
+        // the interval production uses.
+        receivePollTimeoutMs: 40,
+      },
+      new Stats(),
+    )
+
+    const waiting = () =>
+      events(config.outputDir).filter((e) => e.type === "ws_recv_waiting")
+    const deadline = Date.now() + 5000
+    while (waiting().length < 3 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    controller.abort()
+    const outcome = await session
+    await diagnostics.finish()
+
+    expect(outcome).toBe("canceled")
+
+    const recorded = events(config.outputDir)
+    const waits = waiting()
+    expect(waits.length).toBeGreaterThanOrEqual(3)
+
+    // One event per poll interval, with a rising cumulative wait.
+    const waited = waits.slice(0, 3).map((event) => event["waitedMs"] as number)
+    expect(waited).toEqual([...waited].sort((a, b) => a - b))
+    expect(new Set(waited).size).toBe(3)
+
+    for (const event of waits) {
+      expect(event).toEqual({
+        schemaVersion: 1,
+        timestamp: expect.any(Number),
+        type: "ws_recv_waiting",
+        sessionId: config.sessionId,
+        workerId: config.workerId,
+        iterationId: config.iterationId,
+        socketId: 0,
+        inputLineNumber: 8,
+        eventType: "WS_RECV_INIT",
+        waitedMs: expect.any(Number),
+      })
+    }
+
+    // Nothing else happens while the session waits: the wait events are the
+    // whole story between opening the socket and giving up on the message.
+    const types = recorded
+      .slice(recorded.findIndex((e) => e.type === "ws_open"))
+      .map((event) => event["type"] as string)
+      .filter((type) => type !== "run_end")
+    const closedAt = types.indexOf("ws_close_requested")
+    expect(closedAt).toBeGreaterThan(0)
+    // Between opening the socket and giving up, the only thing that happens is
+    // the wait repeating; then the shutdown sequence follows in order.
+    expect(types.slice(1, closedAt).every((t) => t === "ws_recv_waiting")).toBe(
+      true,
+    )
+    expect(types.slice(closedAt)).toEqual([
+      "ws_close_requested",
+      "session_end",
+      "ws_closed",
+    ])
+    expect(recorded.find((event) => event.type === "session_end")).toEqual(
+      expect.objectContaining({ outcome: "canceled" }),
+    )
+
+    // The event carries no message content, URL, or free-form text.
+    const text = fs.readFileSync(
+      path.join(config.outputDir, "diagnostics.jsonl"),
+      "utf8",
+    )
+    expect(text).not.toContain(mock.url)
+    expect(text).not.toContain("secret-sentinel")
+  })
+})

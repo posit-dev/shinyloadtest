@@ -37,7 +37,8 @@ published as `shinyloadtest` on npm.
 
 * Added `--diagnostics` to `replay` (off by default): writes a credential-free
   `diagnostics.jsonl` event log to the output directory, covering session
-  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, and
+  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, required
+  receives that are still waiting, and
   retry delays. No URLs, headers, credentials, or error strings are recorded.
 
 * Warmup no longer hangs. A recorded message that the application never sends
