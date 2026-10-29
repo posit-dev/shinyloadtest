@@ -21,6 +21,15 @@ published as `shinyloadtest` on npm.
   legacy `SHINYCANNON_CONNECT_API_KEY` are now sent with the initial app
   requests (#7).
 
+* Session CSVs no longer record credential-bearing `-H` header values. The
+  two metadata comment lines at the top of each session file now write
+  `[REDACTED]` in place of values for header names that look like credentials
+  (case-insensitive `Authorization`, `Cookie`, and names containing `token`,
+  `secret`, `password`, `api-key`, `apikey`, or `credential`). Replay still
+  sends the real header values. The redaction applies to the files only:
+  `-H` values are still visible in the process argument list, so pass secrets
+  through the environment variables instead.
+
 * Added `shinyloadtest report` to generate performance reports from load test
   results. Supports HTML (interactive dashboard), text (Markdown tables), and
   JSON output formats. The HTML report is self-contained and includes charts

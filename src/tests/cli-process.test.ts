@@ -5,6 +5,7 @@ import * as path from "node:path"
 import * as os from "node:os"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
 import { withTeardown } from "./helpers/teardown.js"
+import { REDACTED_HEADER_VALUE } from "../cli.js"
 
 const MAIN_JS = path.resolve("dist/main.mjs")
 const FAKE_URL = "http://127.0.0.1:65535"
@@ -294,6 +295,12 @@ describe.each(["SHINYLOADTEST_CONNECT_API_KEY", "SHINYCANNON_CONNECT_API_KEY"])(
             fs.readFileSync(path.join(sessionsDir, name), "utf-8"),
           )
           expect(csvs.join("\n")).toContain("PLAYBACK_DONE")
+          // The metadata comments keep the benign header but never the
+          // credential-bearing one (see the session CSV regression tests).
+          expect(csvs.join("\n")).toContain('-H "X-Test: retained-by-cli"')
+          expect(csvs.join("\n")).toContain(
+            `-H "authorization: ${REDACTED_HEADER_VALUE}"`,
+          )
 
           const allOutput = [
             ...collectFileContents(outputDir),
@@ -301,6 +308,7 @@ describe.each(["SHINYLOADTEST_CONNECT_API_KEY", "SHINYCANNON_CONNECT_API_KEY"])(
             result.stderr,
           ].join("\n")
           expect(allOutput).not.toContain(FAKE_API_KEY)
+          expect(allOutput).not.toContain("Bearer superseded")
         },
         async () => {
           await mock.stop()
