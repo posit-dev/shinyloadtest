@@ -3,6 +3,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
+import { withTeardown } from "./helpers/teardown.js"
 import {
   runSession,
   Stats,
@@ -201,59 +202,62 @@ describe("Session Integration", { timeout: 30000 }, () => {
     })
     await altMock.start()
     let tmpDir2: string | undefined
-    try {
-      tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-bc04-"))
-      const recPath = path.join(tmpDir2, "recording.log")
-      fs.writeFileSync(recPath, altMock.makeRecording())
-      const outDir = path.join(tmpDir2, "output")
-      createOutputDir({
-        outputDir: outDir,
-        overwrite: false,
-        version: "test",
-        recordingPath: recPath,
-      })
-
-      const rec = readRecordingFromString(fs.readFileSync(recPath, "utf-8"))
-      const stats = new Stats()
-      const logger = createLogger({
-        name: "test",
-        consoleLevel: LogLevel.SILENT,
-      })
-
-      await runSession(
-        {
-          sessionId: 900,
-          workerId: 0,
-          iterationId: 0,
-          httpUrl: altMock.url,
-          recording: rec,
-          recordingPath: recPath,
-          headers: {},
-          creds: { user: null, pass: null, connectApiKey: null },
-          logger,
+    await withTeardown(
+      async () => {
+        tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "shinyloadtest-bc04-"))
+        const recPath = path.join(tmpDir2, "recording.log")
+        fs.writeFileSync(recPath, altMock.makeRecording())
+        const outDir = path.join(tmpDir2, "output")
+        createOutputDir({
           outputDir: outDir,
-          argsString: "test",
-          argsJson: "{}",
-        },
-        stats,
-      )
+          overwrite: false,
+          version: "test",
+          recordingPath: recPath,
+        })
 
-      const csvPath = path.join(outDir, "sessions", "900_0_0.csv")
-      const lines = fs
-        .readFileSync(csvPath, "utf-8")
-        .split("\n")
-        .filter((l) => l.length > 0)
-      const events = lines
-        .filter((l) => !l.startsWith("#") && !l.startsWith("session_id"))
-        .map((l) => l.split(",")[3]!)
-        .filter(Boolean)
+        const rec = readRecordingFromString(fs.readFileSync(recPath, "utf-8"))
+        const stats = new Stats()
+        const logger = createLogger({
+          name: "test",
+          consoleLevel: LogLevel.SILENT,
+        })
 
-      expect(events).toContain("PLAYBACK_DONE")
-      expect(stats.getCounts().done).toBe(1)
-    } finally {
-      if (tmpDir2) fs.rmSync(tmpDir2, { recursive: true, force: true })
-      await altMock.stop()
-    }
+        await runSession(
+          {
+            sessionId: 900,
+            workerId: 0,
+            iterationId: 0,
+            httpUrl: altMock.url,
+            recording: rec,
+            recordingPath: recPath,
+            headers: {},
+            creds: { user: null, pass: null, connectApiKey: null },
+            logger,
+            outputDir: outDir,
+            argsString: "test",
+            argsJson: "{}",
+          },
+          stats,
+        )
+
+        const csvPath = path.join(outDir, "sessions", "900_0_0.csv")
+        const lines = fs
+          .readFileSync(csvPath, "utf-8")
+          .split("\n")
+          .filter((l) => l.length > 0)
+        const events = lines
+          .filter((l) => !l.startsWith("#") && !l.startsWith("session_id"))
+          .map((l) => l.split(",")[3]!)
+          .filter(Boolean)
+
+        expect(events).toContain("PLAYBACK_DONE")
+        expect(stats.getCounts().done).toBe(1)
+      },
+      async () => {
+        if (tmpDir2) fs.rmSync(tmpDir2, { recursive: true, force: true })
+        await altMock.stop()
+      },
+    )
   })
 
   describe("comm_id mapping helpers", () => {

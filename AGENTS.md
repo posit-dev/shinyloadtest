@@ -18,6 +18,12 @@ The original Kotlin source is in both repos; historical community issues and pul
 - Per-session `tough-cookie` jars provide cookie isolation between workers
 - `AsyncQueue` in `websocket.ts` buffers inbound WS messages (capacity defined
   in `types.ts`)
+- Test teardown that awaits anything in a `finally` block replaces the error
+  it is cleaning up after, so a failing teardown hides the assertion that
+  failed (a hanging one turns into a bare test timeout). Route that teardown
+  through `withTeardown` in `src/tests/helpers/teardown.ts`: the body error
+  stays the thrown error, the teardown error becomes its `cause`, and the
+  whole teardown is bounded by a deadline.
 
 ## Releasing
 

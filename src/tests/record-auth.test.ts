@@ -11,6 +11,7 @@ import { HttpStatusError } from "../http.js"
 import { readRecording } from "../recording.js"
 import { ServerType } from "../types.js"
 import { MockShinyServer } from "./helpers/mock-shiny-server.js"
+import { withTeardown, withTimeout } from "./helpers/teardown.js"
 
 const API_KEY = "record-auth-test-key"
 const AUTH_ENV_VARS = [
@@ -22,16 +23,7 @@ const AUTH_ENV_VARS = [
   "SHINYCANNON_PASS",
 ]
 
-function withTimeout<T>(promise: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error("Recording test timed out")),
-      5000,
-    )
-  })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
-}
+const RECORDING_STEP_TIMEOUT_MS = 5_000
 
 async function driveRecording(
   targetUrl: string,
@@ -66,38 +58,60 @@ async function driveRecording(
   )
   let proxy: RecordingProxy | undefined
   let ws: WebSocket | undefined
-  try {
-    proxy = await withTimeout(
-      Promise.race([
-        proxyReady,
-        outcome.then(({ error }) => {
-          throw error ?? new Error("Recording exited before startup")
-        }),
-      ]),
-    )
-    const port = (proxy.httpServer!.address() as AddressInfo).port
-    const response = await fetch(`http://127.0.0.1:${port}/`, {
-      signal: AbortSignal.timeout(5000),
-    })
-    await response.text()
+  return withTeardown(
+    async () => {
+      proxy = await withTimeout(
+        Promise.race([
+          proxyReady,
+          outcome.then(({ error }) => {
+            throw error ?? new Error("Recording exited before startup")
+          }),
+        ]),
+        RECORDING_STEP_TIMEOUT_MS,
+        "Recording proxy startup",
+      )
+      const port = (proxy.httpServer!.address() as AddressInfo).port
+      const response = await fetch(`http://127.0.0.1:${port}/`, {
+        signal: AbortSignal.timeout(RECORDING_STEP_TIMEOUT_MS),
+      })
+      await response.text()
 
-    ws = new WebSocket(`ws://127.0.0.1:${port}/websocket`)
-    // once() rejects connection errors; this listener also covers cleanup errors.
-    ws.on("error", () => {})
-    await withTimeout(once(ws, "message"))
-    const closed = once(ws, "close")
-    ws.close()
-    await withTimeout(closed)
-    const result = await withTimeout(outcome)
-    if (result.error !== null) throw result.error
-    return response.status
-  } finally {
-    ws?.terminate()
-    if (proxy && !finished) {
-      proxy.onShutdown()
-      await withTimeout(outcome)
-    }
-  }
+      ws = new WebSocket(`ws://127.0.0.1:${port}/websocket`)
+      // once() rejects connection errors; this listener also covers cleanup.
+      ws.on("error", () => {})
+      await withTimeout(
+        once(ws, "message"),
+        RECORDING_STEP_TIMEOUT_MS,
+        "Recorded WebSocket message",
+      )
+      const closed = once(ws, "close")
+      ws.close()
+      await withTimeout(
+        closed,
+        RECORDING_STEP_TIMEOUT_MS,
+        "Recorded WebSocket close",
+      )
+      const result = await withTimeout(
+        outcome,
+        RECORDING_STEP_TIMEOUT_MS,
+        "Recording completion",
+      )
+      if (result.error !== null) throw result.error
+      return response.status
+    },
+    async () => {
+      ws?.terminate()
+      if (proxy && !finished) {
+        proxy.onShutdown()
+        await withTimeout(
+          outcome,
+          RECORDING_STEP_TIMEOUT_MS,
+          "Recording shutdown",
+        )
+      }
+    },
+    { operation: "Recording teardown" },
+  )
 }
 
 describe("recording protected Connect content", () => {
