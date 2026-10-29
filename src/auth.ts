@@ -4,7 +4,7 @@
  * and Connect API key authentication.
  */
 
-import { type HttpClient } from "./http.js"
+import { type HttpClient, HttpStatusError } from "./http.js"
 import { type Creds, ServerType } from "./types.js"
 
 // ---------------------------------------------------------------------------
@@ -107,12 +107,30 @@ export async function loginSSP(
 export async function getConnectCookies(
   httpClient: HttpClient,
   appUrl: string,
+  signal?: AbortSignal,
 ): Promise<void> {
-  await httpClient.get(appUrl)
+  const response = await httpClient.get(appUrl, signal)
+  if (response.statusCode >= 400) {
+    throw new HttpStatusError(response.statusCode, appUrl, response.body)
+  }
 }
 
 export function connectApiKeyHeader(apiKey: string): Record<string, string> {
   return { Authorization: `Key ${apiKey}` }
+}
+
+export function withConnectApiKey(
+  headers: Record<string, string>,
+  apiKey: string | null,
+): Record<string, string> {
+  if (apiKey === null) return { ...headers }
+
+  const customHeaders = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name]) => name.toLowerCase() !== "authorization",
+    ),
+  )
+  return { ...customHeaders, ...connectApiKeyHeader(apiKey) }
 }
 
 // ---------------------------------------------------------------------------

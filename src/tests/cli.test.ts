@@ -101,6 +101,31 @@ describe("serializeArgs", () => {
     expect(argsString).toContain('-H "X-Custom: value1"')
     expect(argsString).toContain('-H "Authorization: Bearer tok"')
   })
+
+  it("includes --diagnostics in argsString only when true", () => {
+    expect(serializeArgs(makeArgs({ diagnostics: true })).argsString).toContain(
+      "--diagnostics",
+    )
+    expect(
+      serializeArgs(makeArgs({ diagnostics: false })).argsString,
+    ).not.toContain("--diagnostics")
+    expect(serializeArgs(makeArgs()).argsString).not.toContain("--diagnostics")
+  })
+
+  it("includes diagnostics in argsJson only when supplied", () => {
+    const parsed = JSON.parse(serializeArgs(makeArgs()).argsJson)
+    expect(parsed).not.toHaveProperty("diagnostics")
+
+    const parsedTrue = JSON.parse(
+      serializeArgs(makeArgs({ diagnostics: true })).argsJson,
+    )
+    expect(parsedTrue.diagnostics).toBe(true)
+
+    const parsedFalse = JSON.parse(
+      serializeArgs(makeArgs({ diagnostics: false })).argsJson,
+    )
+    expect(parsedFalse.diagnostics).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -209,6 +234,33 @@ describe("parseArgs", () => {
     expect(result.command).toBe("replay")
     if (result.command !== "replay") return
     expect(result.args.appUrl).toBe("http://recorded-host.example.com")
+  })
+
+  it("defaults diagnostics to false when not provided", () => {
+    const result = parseArgs([
+      "node",
+      "script",
+      "replay",
+      recordingFile,
+      "http://example.com",
+    ])
+    expect(result.command).toBe("replay")
+    if (result.command !== "replay") return
+    expect(result.args.diagnostics).toBe(false)
+  })
+
+  it("parses --diagnostics", () => {
+    const result = parseArgs([
+      "node",
+      "script",
+      "replay",
+      recordingFile,
+      "http://example.com",
+      "--diagnostics",
+    ])
+    expect(result.command).toBe("replay")
+    if (result.command !== "replay") return
+    expect(result.args.diagnostics).toBe(true)
   })
 })
 

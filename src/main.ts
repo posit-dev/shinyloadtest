@@ -8,11 +8,13 @@ import { report } from "./report/report.js"
 import { readRecording, recordingDuration } from "./recording.js"
 import { createLogger } from "./logger.js"
 import { createOutputDir } from "./replay/output.js"
+import { ReplayDiagnostics } from "./replay/diagnostics.js"
 import { runEnduranceTest } from "./replay/worker.js"
 import { SERVER_TYPE_NAMES, ServerType } from "./types.js"
 import { HttpClient, HttpStatusError } from "./http.js"
 import { detectServerType, AppDetectionError } from "./detect.js"
 import { ReplayTerminalUI } from "./replay/ui.js"
+import { withConnectApiKey } from "./auth.js"
 
 async function main(): Promise<void> {
   const result = parseArgs()
@@ -71,7 +73,8 @@ async function main(): Promise<void> {
   // Detect live server type for validation
   const detectionClient = new HttpClient({
     cookieJar: new CookieJar(),
-    headers: args.headers,
+    // Runtime credentials must not enter args.headers, which is serialized to CSV.
+    headers: withConnectApiKey(args.headers, args.creds.connectApiKey),
     userAgent: `shinyloadtest/${VERSION}`,
   })
 
@@ -110,6 +113,16 @@ async function main(): Promise<void> {
   const maxErrors = args.maxErrors !== null ? args.maxErrors : args.workers * 5
 
   const { argsString, argsJson } = serializeArgs(args)
+
+  // Opt-in diagnostics writer, created after preflight validation so the
+  // log covers the replay run itself, not server detection.
+  const diagnostics = args.diagnostics
+    ? new ReplayDiagnostics({
+        outputDir: args.outputDir,
+        numWorkers: args.workers,
+        maxErrors,
+      })
+    : undefined
 
   const ui = process.stderr.isTTY
     ? new ReplayTerminalUI({
@@ -150,22 +163,48 @@ async function main(): Promise<void> {
     })
   }
 
-  await runEnduranceTest({
-    httpUrl: args.appUrl,
-    recording,
-    recordingPath: args.recordingPath,
-    headers: args.headers,
-    creds: args.creds,
-    numWorkers: args.workers,
-    warmupInterval: startInterval,
-    loadedDurationMinutes: args.loadedDurationMinutes,
-    maxErrors,
-    outputDir: args.outputDir,
-    logger,
-    argsString,
-    argsJson,
-    ui,
-  })
+  let runError: unknown
+  let runFailed = false
+  try {
+    await runEnduranceTest({
+      httpUrl: args.appUrl,
+      recording,
+      recordingPath: args.recordingPath,
+      headers: args.headers,
+      creds: args.creds,
+      numWorkers: args.workers,
+      warmupInterval: startInterval,
+      loadedDurationMinutes: args.loadedDurationMinutes,
+      maxErrors,
+      outputDir: args.outputDir,
+      logger,
+      argsString,
+      argsJson,
+      ui,
+      diagnostics,
+    })
+  } catch (err) {
+    runFailed = true
+    runError = err
+  }
+
+  // Flush the diagnostics writer before process.exit: finish() waits for
+  // outstanding sockets, writes the run_end marker, and rethrows the first
+  // retained writer error so instrumentation failures surface. If the test
+  // itself failed, the test's error wins; the writer failure is logged.
+  if (diagnostics) {
+    try {
+      await diagnostics.finish()
+    } catch (err) {
+      if (!runFailed) throw err
+      const message = err instanceof Error ? err.message : String(err)
+      logger.warn(`Diagnostics writer failed: ${message}`)
+    }
+  }
+
+  if (runFailed) {
+    throw runError
+  }
 
   process.exit(0)
 }

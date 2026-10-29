@@ -3,6 +3,7 @@ import {
   loginUrlFor,
   extractHiddenInputs,
   connectApiKeyHeader,
+  withConnectApiKey,
   getCreds,
   isProtected,
 } from "../auth.js"
@@ -108,6 +109,37 @@ describe("connectApiKeyHeader", () => {
   it("includes full key in header value", () => {
     const header = connectApiKeyHeader("abc-123-def")
     expect(header["Authorization"]).toBe("Key abc-123-def")
+  })
+})
+
+describe("withConnectApiKey", () => {
+  it("replaces all Authorization case variants without mutating caller headers", () => {
+    const headers = {
+      Authorization: "Bearer first",
+      authorization: "Bearer second",
+      AUTHORIZATION: "Bearer third",
+      "X-Custom": "retained",
+    }
+
+    expect(withConnectApiKey(headers, "test-key")).toEqual({
+      Authorization: "Key test-key",
+      "X-Custom": "retained",
+    })
+    expect(headers).toEqual({
+      Authorization: "Bearer first",
+      authorization: "Bearer second",
+      AUTHORIZATION: "Bearer third",
+      "X-Custom": "retained",
+    })
+  })
+
+  it("preserves caller-provided authorization when no API key is configured", () => {
+    const headers = { authorization: "Bearer supplied", "X-Custom": "retained" }
+
+    const merged = withConnectApiKey(headers, null)
+
+    expect(merged).toEqual(headers)
+    expect(merged).not.toBe(headers)
   })
 })
 

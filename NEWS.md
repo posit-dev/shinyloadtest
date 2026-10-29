@@ -16,6 +16,11 @@ published as `shinyloadtest` on npm.
   and `SHINYLOADTEST_CONNECT_API_KEY`. The legacy `SHINYCANNON_*` names are
   still accepted as fallbacks.
 
+* Fixed API-key authentication when recording or replaying login-protected
+  Posit Connect apps. Keys set through `SHINYLOADTEST_CONNECT_API_KEY` or the
+  legacy `SHINYCANNON_CONNECT_API_KEY` are now sent with the initial app
+  requests (#7).
+
 * Added `shinyloadtest report` to generate performance reports from load test
   results. Supports HTML (interactive dashboard), text (Markdown tables), and
   JSON output formats. The HTML report is self-contained and includes charts
@@ -25,6 +30,15 @@ published as `shinyloadtest` on npm.
   event throughput stats during the loaded phase.
 
 * Added support for Jupyter widget / shinywidgets messages in recordings.
+
+* Replay workers now back off between failed session attempts: about 1s after
+  the first failure, doubling per consecutive failure up to 30s, with ±25%
+  jitter, reset after a successful session. Earlier alphas retried immediately.
+
+* Added `--diagnostics` to `replay` (off by default): writes a credential-free
+  `diagnostics.jsonl` event log to the output directory, covering session
+  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, and
+  retry delays. No URLs, headers, credentials, or error strings are recorded.
 
 * The recording format, output format, and analysis workflows with the
   shinyloadtest R package are fully compatible with previous versions.

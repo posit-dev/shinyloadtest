@@ -3,6 +3,26 @@ import { WebSocketServer } from "ws"
 import { AsyncQueue, ShinyWebSocket } from "../replay/websocket.js"
 import type { WSMessage } from "../replay/websocket.js"
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${operation} timed out after ${timeoutMs}ms`))
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 describe("AsyncQueue", () => {
   it("returns items in FIFO order", async () => {
     const q = new AsyncQueue<string>(10)
@@ -90,6 +110,76 @@ describe("ShinyWebSocket malformed frame handling", () => {
     } finally {
       sws.close()
       await new Promise<void>((resolve) => wss.close(() => resolve()))
+    }
+  })
+})
+
+describe("ShinyWebSocket queue and shutdown", () => {
+  it("delivers a real message and closes promptly after a canceled queue wait", async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    await new Promise<void>((resolve) => wss.once("listening", resolve))
+    const { port } = wss.address() as { port: number }
+    let messagesSent = 0
+    let closes = 0
+    const serverClosed = new Promise<void>((resolve) => {
+      wss.once("connection", (ws) => {
+        ws.once("close", () => {
+          closes++
+          resolve()
+        })
+        ws.send(
+          JSON.stringify({
+            values: { synthetic: 1 },
+            errors: {},
+            inputMessages: [],
+          }),
+        )
+        messagesSent++
+      })
+    })
+    const socket = new ShinyWebSocket({
+      url: `ws://127.0.0.1:${port}`,
+      headers: {},
+    })
+    let pending: Promise<WSMessage | null> | undefined
+    try {
+      const first = await socket.receiveQueue.poll(1_000)
+      expect(first?.kind).toBe("text")
+      const controller = new AbortController()
+      pending = socket.receiveQueue.poll(10_000, controller.signal)
+      controller.abort()
+      expect(await withTimeout(pending, 1_000, "Aborted queue poll")).toBeNull()
+      socket.close()
+      await withTimeout(serverClosed, 2_000, "Server-side socket close")
+      expect(messagesSent).toBe(1)
+      expect(closes).toBe(1)
+    } finally {
+      socket.close()
+      const clientCloses = [...wss.clients].map(
+        (client) =>
+          new Promise<void>((resolve) => {
+            client.once("close", resolve)
+            client.terminate()
+          }),
+      )
+      // Release a poll whose cancellation failed, including its underlying timer.
+      if (pending) {
+        socket.receiveQueue.offer({
+          kind: "error",
+          error: new Error("Test cleanup"),
+        })
+      }
+      await withTimeout(
+        Promise.all([
+          ...clientCloses,
+          new Promise<void>((resolve, reject) => {
+            wss.close((error) => (error ? reject(error) : resolve()))
+          }),
+        ]),
+        2_000,
+        "WebSocket server shutdown",
+      )
+      if (pending) await withTimeout(pending, 1_000, "Queue poll cleanup")
     }
   })
 })

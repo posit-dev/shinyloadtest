@@ -214,6 +214,63 @@ describe("Auth Integration", { timeout: 30000 }, () => {
     expect(counts.failed).toBe(0)
   })
 
+  it.each(["Authorization", "authorization", "AUTHORIZATION"])(
+    "authenticates the cookie bootstrap and preserves custom headers for HTTP and WebSocket requests (%s)",
+    async (authorizationHeader) => {
+      mock = new MockShinyServer({ connectApiKey: "test-connect-key" })
+      await mock.start()
+
+      tmpDir = makeTempDir()
+      const recordingContent = mock.makeRecording()
+      const { outputDir, recordingPath } = setupOutputDir(
+        tmpDir,
+        recordingContent,
+      )
+      const { logger } = createCapturingLogger()
+      const stats = new Stats()
+      const headers = {
+        "X-Test": "retained",
+        [authorizationHeader]: "Bearer superseded",
+      }
+
+      await runSession(
+        makeSessionConfig({
+          httpUrl: mock.url,
+          recording: readRecordingFromString(recordingContent),
+          recordingPath,
+          logger,
+          outputDir,
+          headers,
+          creds: { user: null, pass: null, connectApiKey: "test-connect-key" },
+        }),
+        stats,
+      )
+
+      expect(stats.getCounts()).toMatchObject({ done: 1, failed: 0 })
+      expect(readCsvEvents(outputDir)).toContain("PLAYBACK_DONE")
+      expect(mock.httpRequests[0]).toMatchObject({
+        authorization: "Key test-connect-key",
+        "x-test": "retained",
+      })
+      expect(mock.httpRequests[0]?.cookie).toBeUndefined()
+      expect(mock.httpRequests[1]).toMatchObject({
+        authorization: "Key test-connect-key",
+        cookie: "rscid=mock-connect-session",
+        "x-test": "retained",
+      })
+      expect(mock.wsRequests).toHaveLength(1)
+      expect(mock.wsRequests[0]).toMatchObject({
+        authorization: "Key test-connect-key",
+        cookie: "rscid=mock-connect-session",
+        "x-test": "retained",
+      })
+      expect(headers).toEqual({
+        "X-Test": "retained",
+        [authorizationHeader]: "Bearer superseded",
+      })
+    },
+  )
+
   it("session completes without any creds (no login attempted)", async () => {
     mock = new MockShinyServer()
     await mock.start()

@@ -5,6 +5,10 @@
  */
 
 import { CookieJar } from "tough-cookie"
+import type {
+  DiagnosticContext,
+  ReplayDiagnostics,
+} from "./replay/diagnostics.js"
 
 // ---------------------------------------------------------------------------
 // HttpResponse
@@ -137,15 +141,26 @@ export class HttpClient {
   readonly cookieJar: CookieJar
   private customHeaders: Record<string, string>
   private readonly userAgent: string
+  private readonly diagnostics?: {
+    writer: ReplayDiagnostics
+    context: DiagnosticContext
+  }
+  private diagnosticPhase: "bootstrap" | "playback" = "bootstrap"
 
   constructor(options: {
     cookieJar: CookieJar
     headers: Record<string, string>
     userAgent: string
+    diagnostics?: { writer: ReplayDiagnostics; context: DiagnosticContext }
   }) {
     this.cookieJar = options.cookieJar
     this.customHeaders = options.headers
     this.userAgent = options.userAgent
+    this.diagnostics = options.diagnostics
+  }
+
+  setDiagnosticPhase(phase: "bootstrap" | "playback"): void {
+    this.diagnosticPhase = phase
   }
 
   setHeaders(headers: Record<string, string>): void {
@@ -190,7 +205,41 @@ export class HttpClient {
   private async request(
     url: string,
     init: {
-      method: string
+      method: "GET" | "POST"
+      headers?: Record<string, string>
+      body?: string | Buffer | null
+      signal?: AbortSignal
+    },
+  ): Promise<HttpResponse> {
+    const startedAt = performance.now()
+    try {
+      const response = await this.performRequest(url, init)
+      this.diagnostics?.writer.emit({
+        type: "http_complete",
+        ...this.diagnostics.context,
+        phase: this.diagnosticPhase,
+        method: init.method,
+        statusCode: response.statusCode,
+        durationMs: performance.now() - startedAt,
+      })
+      return response
+    } catch (error) {
+      this.diagnostics?.writer.emit({
+        type: "http_error",
+        ...this.diagnostics.context,
+        phase: this.diagnosticPhase,
+        method: init.method,
+        durationMs: performance.now() - startedAt,
+        aborted: init.signal?.aborted === true,
+      })
+      throw error
+    }
+  }
+
+  private async performRequest(
+    url: string,
+    init: {
+      method: "GET" | "POST"
       headers?: Record<string, string>
       body?: string | Buffer | null
       signal?: AbortSignal
