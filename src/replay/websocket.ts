@@ -122,6 +122,7 @@ const POLL_TIMEOUT_MS = 30_000
 export class ShinyWebSocket {
   readonly receiveQueue: AsyncQueue<WSMessage>
   private readonly ws: WebSocket
+  private readonly pollTimeoutMs: number
   private _closedByServer = false
   private _closedByClient = false
   private _terminalError: Error | null = null
@@ -136,8 +137,14 @@ export class ShinyWebSocket {
     url: string
     headers: Record<string, string>
     onIgnored?: (msg: string) => void
+    /**
+     * How long `receive` polls before warning and polling again. Defaults to
+     * 30 seconds; shortened by tests that need to observe the wait cadence.
+     */
+    pollTimeoutMs?: number
     diagnostics?: { writer: ReplayDiagnostics; context: DiagnosticContext }
   }) {
+    this.pollTimeoutMs = options.pollTimeoutMs ?? POLL_TIMEOUT_MS
     this.receiveQueue = new AsyncQueue<WSMessage>(RECEIVE_QUEUE_SIZE)
     const tracked = options.diagnostics?.writer.registerSocket()
     this.diagnostics =
@@ -205,7 +212,7 @@ export class ShinyWebSocket {
   }
 
   /**
-   * Wait for a non-ignorable message. Polls the queue with 30s timeout,
+   * Wait for a non-ignorable message. Polls the queue for `pollTimeoutMs`,
    * calling warnFn each time a timeout occurs. Throws if an error message
    * is received.
    */
@@ -213,7 +220,7 @@ export class ShinyWebSocket {
     warnFn: (elapsedSeconds: number) => void,
     signal?: AbortSignal,
   ): Promise<string> {
-    let elapsed = POLL_TIMEOUT_MS / 1000
+    let elapsed = this.pollTimeoutMs / 1000
 
     while (true) {
       if (this._terminalError) {
@@ -222,7 +229,7 @@ export class ShinyWebSocket {
 
       if (signal?.aborted) throw signal.reason ?? new Error("Aborted")
 
-      const msg = await this.receiveQueue.poll(POLL_TIMEOUT_MS, signal)
+      const msg = await this.receiveQueue.poll(this.pollTimeoutMs, signal)
 
       if (msg === null) {
         if (this._terminalError) {
@@ -230,7 +237,7 @@ export class ShinyWebSocket {
         }
         if (signal?.aborted) throw signal.reason ?? new Error("Aborted")
         warnFn(elapsed)
-        elapsed += POLL_TIMEOUT_MS / 1000
+        elapsed += this.pollTimeoutMs / 1000
         continue
       }
 
@@ -267,6 +274,11 @@ export class ShinyWebSocket {
   /** Whether the connection was closed by the server. */
   get closedByServer(): boolean {
     return this._closedByServer
+  }
+
+  /** Diagnostics socket id, or null when diagnostics are disabled. */
+  get socketId(): number | null {
+    return this.diagnostics?.socketId ?? null
   }
 
   /** Set a failure callback invoked on error or server-initiated close. */

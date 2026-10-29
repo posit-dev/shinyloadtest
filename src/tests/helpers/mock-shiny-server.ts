@@ -33,6 +33,8 @@ export class MockShinyServer {
 
   readonly httpRequests: http.IncomingHttpHeaders[] = []
   readonly wsRequests: http.IncomingHttpHeaders[] = []
+  /** Close codes the peer observed, in arrival order. */
+  readonly wsCloseCodes: number[] = []
 
   constructor(options: MockShinyServerOptions = {}) {
     this.options = options
@@ -231,7 +233,10 @@ export class MockShinyServer {
 
   private handleWs(ws: WebSocket): void {
     this.connections.add(ws)
-    ws.on("close", () => this.connections.delete(ws))
+    ws.on("close", (code: number) => {
+      this.wsCloseCodes.push(code)
+      this.connections.delete(ws)
+    })
 
     const sessionId = `session-${this.sessionCounter++}`
     const initDelay = this.options.wsInitDelay ?? 0

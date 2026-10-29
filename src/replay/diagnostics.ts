@@ -5,8 +5,9 @@
  * writes a strict, credential-free JSONL event log to
  * `<outputDir>/diagnostics.jsonl`. The log captures the client-side session
  * lifecycle: session start/end, per-request HTTP timing split into
- * `bootstrap` and `playback` phases, WebSocket creation/open/close, and
- * retry delays. It tracks what the client transport actually did — it does
+ * `bootstrap` and `playback` phases, WebSocket creation/open/close, required
+ * receives that are still waiting, and retry delays. It tracks what the client
+ * transport actually did — it does
  * not know anything about server-side (e.g. Posit Connect) logical session
  * counts.
  *
@@ -53,6 +54,16 @@ export type HttpMethod = "GET" | "POST"
 export type WsCloseOrigin = "client" | "other"
 
 /**
+ * Recording events whose receive cannot be skipped: the session ID, the upload
+ * job ID, and the SockJS open frame. They wait indefinitely by design, so a
+ * wait is reported periodically rather than bounded.
+ */
+export type RequiredReceiveType =
+  | "WS_RECV"
+  | "WS_RECV_INIT"
+  | "WS_RECV_BEGIN_UPLOAD"
+
+/**
  * Allowlisted diagnostic events. Every payload field is an ID, count, status
  * code, duration, or enum-like outcome — never a URL, header, body,
  * credential, or free-form error string.
@@ -72,6 +83,13 @@ export type DiagnosticEvent =
       type: "ws_recv_skipped"
       inputLineNumber: number
       reason: "ignored" | "timeout" | "mismatch"
+    } & DiagnosticContext)
+  | ({
+      type: "ws_recv_waiting"
+      socketId: number
+      inputLineNumber: number
+      eventType: RequiredReceiveType
+      waitedMs: number
     } & DiagnosticContext)
   | ({
       type: "http_complete"
@@ -151,6 +169,12 @@ const EVENT_FIELDS: Record<DiagnosticEvent["type"], readonly string[]> = {
     "wsRecvMismatch",
   ],
   ws_recv_skipped: [...CONTEXT_FIELDS, "inputLineNumber", "reason"],
+  ws_recv_waiting: [
+    ...SOCKET_FIELDS,
+    "inputLineNumber",
+    "eventType",
+    "waitedMs",
+  ],
   http_complete: [
     ...CONTEXT_FIELDS,
     "phase",

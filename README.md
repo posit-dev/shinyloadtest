@@ -80,107 +80,56 @@ is omitted, the target URL from the recording file is used.
 | `--diagnostics` | Write a credential-free diagnostics event log (`diagnostics.jsonl`) to the output directory (default: off) |
 | `--log-level <level>` | Console log level: `debug`, `info`, `warn`, `error` (default: `warn`) |
 
-When a session fails, its worker waits before the next attempt: about 1s
-after the first failure, doubling per consecutive failure up to 30s, with
-±25% jitter so workers that fail together don't retry in lockstep. A
-successful session resets the delay. Waiting workers are not active app
-sessions: the requested worker count is not proof of achieved concurrency
-when sessions are failing. This changes failure traffic compared to earlier
-alphas, which retried immediately; it reduces request
-amplification during failures but is not a fix for any particular
-server-side cause, so a baseline run with an earlier version can still be
-informative when reproducing an older report.
+When a session fails, its worker waits before retrying: about 1s after the
+first failure, doubling per consecutive failure up to 30s, with ±25% jitter
+so workers that fail together don't retry in lockstep. A successful session
+resets the delay. Workers waiting to retry are not active app sessions, so
+the requested `--workers` count is not proof of achieved concurrency while
+sessions are failing.
+
+### Slow or stalled sessions
+
+Replay is driven by what the app sends back, not by a clock, so a slow app
+makes a replay slow rather than failed. A few recorded messages must arrive
+before a session can continue at all — the SockJS open frame, the first
+message after connecting, and upload responses, whose contents feed later
+messages and URLs. Replay waits for those instead of failing, logging the
+recording line it is waiting on every 30 seconds. During warmup it gives up
+after 15 minutes with a `Warmup timed out` error naming the workers and the
+frame each was waiting for. Other recorded messages that never arrive are
+skipped with a warning and the session carries on.
+
+Waiting is the normal symptom of a cold or overloaded app, and it resolves on
+its own. Waiting on the same line across every worker usually means the
+recording is stale — the app changed and no longer sends that message — in
+which case re-record.
 
 ### Diagnostics
 
-`--diagnostics` writes `diagnostics.jsonl` to the output directory: one JSON
-object per line, each with `schemaVersion`, `timestamp` (Unix time in
-milliseconds), and `type` plus only the allowlisted fields for that event
-type. Durations and retry delays are also in milliseconds. The events cover the session
-lifecycle (`session_start`; `session_end` with a `done`/`failed`/`canceled`
-outcome), HTTP requests split into `bootstrap` (authentication/session setup) and
-`playback` phases with method, status code, and duration, and an `aborted`
-flag on errors; the WebSocket lifecycle (`ws_created`, `ws_open`,
-`ws_close_requested`, `ws_error`, and `ws_closed` with close code and close
-origin); `ws_recv_skipped` receive classifications; and `retry_wait` backoff
-delays. `run_start` records the shinyloadtest and Node.js versions and the
-worker/max-errors settings.
-
-For meaningful JSON `WS_RECV` events, replay allows the remaining recorded
-quiet interval plus 30 seconds of slack. Its deadline is at least 30 seconds
-and at most 15 minutes from the start of the receive; a match can finish
-earlier. A receive can also stop looking after 16 mismatched non-ignorable
-messages. Matching remains key-based, not a comparison of output values;
-buffered reordered messages can match later receives. Expected messages that
-are now ignorable are skipped. After a skipped or ignored receive, residual
-pacing before the next send, open-socket GET, or close is also capped at 15
-minutes. Ordinary pacing is unchanged. Essential protocol receives and exact
-string-frame matching retain their existing semantics. Replay is
-response-driven, so this policy does not
-enforce the recorded total duration, and very long gaps can exceed the cap.
-
-Each `session_end` includes counts for completed `WS_RECV` events:
-`wsRecvMatched` (including buffered and string matches), `wsRecvIgnored`
-(expected messages filtered as ignorable), `wsRecvTimeout` (no non-ignorable
-message arrived), and `wsRecvMismatch` (messages arrived but none matched
-before the deadline or mismatch limit). Incomplete receives on cancellation
-or failure are not counted. INIT and upload receives are not included.
-Each ignored, timeout, or mismatch result also produces a `ws_recv_skipped`
-event with its `reason` and numeric `inputLineNumber` in the recording.
-There is one event per ignored expectation, so older recordings with many
-ignorable messages can produce larger logs; use the per-session counts for
-summaries. Ignored expectations are not degradation; a nonzero timeout or
-mismatch count indicates tolerated missing meaningful receives even if the
-outcome is `done`. Older schema version 1 files without these counts mean
-unknown, not zero.
-
-Only IDs, recording line numbers, event types, status codes, durations,
-counts, and enum-like outcomes are written. No URLs, headers, cookies, request
-or WebSocket bodies, message-derived identifiers, application JSON key names,
-credentials, or free-form error messages can reach the file: each line is
-built from a per-event field whitelist, so extra properties are dropped even
-if a caller attaches them by mistake.
-
-Things to know when reading the file:
-
-- It shows what the client did. shinyloadtest cannot observe server-side
-  state: `ws_closed` records the client-side view of the transport, not
-  whether the server (e.g. Posit Connect) considers its logical session
-  released.
-- The writer starts after server preflight validation, so it records replay
-  sessions only — the requests made to detect the server type are not in
-  the log.
-- On an orderly finish, `run_end` is the last line, with `activeSockets`
-  (WebSockets that never reported closure within the wait window) and a
-  `complete` flag. Ctrl+C or `SIGTERM` exits immediately: a file with no
-  `run_end` line is an interrupted run — the events that were written are
-  valid, but the tail of the run is missing.
-
-#### Sharing diagnostics
-
-To report a problem, share **only** the `diagnostics.jsonl` file, plus
-sanitized recordings and server logs. Do not share the session CSVs: each
-one embeds the full command line as a comment line, which contains any
-headers passed with `-H` (typically an API key). Do not share the debug log
-either — it records full WebSocket message payloads. If the test uses several
-concurrent CLI processes, collect one diagnostics file from each output
-directory and label them by recording and worker count. Keep the original
-workload settings and add `--diagnostics`; use a separate output directory
-for each process. Client “done” outcomes indicate completed playback, not
-faithful replay, verified app results, or released server sessions. Check the
-receive counts and skip reasons before interpreting a completed session.
-
-To run a specific branch locally instead of an installed version:
+Add `--diagnostics` when a replay hangs, fails without explaining why, or you
+are about to report a bug:
 
 ```bash
-git clone https://github.com/posit-dev/shinyloadtest.git
-cd shinyloadtest
-git checkout <branch>
-npm ci
-npm run build
-node dist/main.mjs replay recording.log https://example.com/app --diagnostics
-# or install the checkout globally: npm install -g .
+shinyloadtest replay recording.log https://example.com/app --workers 5 --diagnostics
 ```
+
+This writes `diagnostics.jsonl` to the output directory: a timeline of what
+each worker actually did — HTTP request timings split into startup and
+playback, WebSocket open and close, receives that were skipped or still
+waiting, retry delays. It holds no URLs, headers, cookies, payloads, or
+credentials, so it can be attached to an issue as-is. Each replay process
+writes its own file, so a test split across several processes produces one
+file per output directory.
+
+It describes the client side only. It cannot tell you whether the server
+released a session, and a `done` outcome means playback completed, not that
+the app rendered the right thing. Check the receive counts and skip reasons
+before trusting a session that looks clean.
+
+> **Don't share the session CSVs.** Each one embeds the command line used for
+> the run as a comment header, including any `-H` header values (typically an
+> API key). `--debug-log` records full WebSocket payloads; treat that file as
+> application data, not as something to post publicly.
 
 ## Report
 

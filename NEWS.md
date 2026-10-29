@@ -37,8 +37,20 @@ published as `shinyloadtest` on npm.
 
 * Added `--diagnostics` to `replay` (off by default): writes a credential-free
   `diagnostics.jsonl` event log to the output directory, covering session
-  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, and
-  retry delays. No URLs, headers, credentials, or error strings are recorded.
+  lifecycle, bootstrap vs. playback HTTP timing, WebSocket lifecycle, waits on
+  required receives, and retry delays. No URLs, headers, credentials, or error
+  strings are recorded.
+
+* Warmup no longer hangs. A recorded message that the application never sends
+  (`WS_RECV_INIT`, an upload response, or the SockJS open frame) is still
+  waited for indefinitely, because it cannot be skipped and any fixed deadline
+  would cut short an application that is slow to start. Previously nothing
+  bounded that wait during warmup, since the loaded-duration timer starts only
+  after the first session of every worker finishes, so a run in which every
+  worker was waiting never finished and only Ctrl+C stopped it. Warmup now
+  stops with a `Warmup timed out` error, naming the workers and the frame they
+  were waiting on, when no session finishes within 15 minutes; a session that
+  is slow but still finishing restarts that window.
 
 * The recording format, output format, and analysis workflows with the
   shinyloadtest R package are fully compatible with previous versions.
