@@ -129,8 +129,10 @@ message, logging a warning with the recording line every 30 seconds, and are
 bounded by the run's end conditions rather than by a timer: the loaded-duration
 expiry, `--max-errors` once other sessions have failed, and Ctrl+C. Warmup is
 the exception: the loaded-duration timer starts only after every worker's first
-session has finished, so a run in which all workers are waiting for a required
-message at that point does not end on its own.
+session has finished, so warmup is bounded on its own — if no session finishes
+within 15 minutes, the test stops and reports a warmup timeout naming the
+workers and the frame each was waiting for. A session that is slow but still
+finishing restarts that window, so a long app start is not cut short.
 
 Each `session_end` includes counts for completed `WS_RECV` events:
 `wsRecvMatched` (including buffered and string matches), `wsRecvIgnored`
@@ -166,9 +168,10 @@ Things to know when reading the file:
 - A session waiting for an essential protocol message has no event of its own:
   nothing follows its last `ws_open` until the message arrives or the run is
   cancelled. While it waits, the console repeats a warning naming the
-  recording line every 30 seconds. If the console output was not captured, a
-  file whose sessions end at `ws_open` with no `session_end` is the signature
-  of a stuck run, not of a slow one.
+  recording line every 30 seconds, and after 10 minutes the warning becomes an
+  error. If the console output was not captured, a file whose sessions end at
+  `ws_open` with no `session_end` is the signature of a stuck run, not of a
+  slow one.
 - On an orderly finish, `run_end` is the last line, with `activeSockets`
   (WebSockets that never reported closure within the wait window) and a
   `complete` flag. Ctrl+C or `SIGTERM` exits immediately: a file with no

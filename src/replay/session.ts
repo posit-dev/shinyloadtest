@@ -129,6 +129,20 @@ export interface SessionConfig {
   diagnostics?: ReplayDiagnostics
   /** Called after each recording event is processed. */
   onProgress?: (eventIndex: number, totalEvents: number) => void
+  /**
+   * Called with the event when the session starts waiting for a required
+   * protocol message, and with `null` when that wait ends. A wait with no
+   * matching `null` is what a stalled session is stalled on.
+   */
+  onRequiredReceiveWait?: (wait: RequiredReceiveWait | null) => void
+}
+
+/** A required protocol receive this session is currently waiting on. */
+export interface RequiredReceiveWait {
+  /** Recording event type, e.g. `WS_RECV_INIT`. */
+  type: string
+  /** Recording line number of the waiting event. */
+  lineNumber: number
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +252,12 @@ async function maybeLogin(
 
 /** Cap receive deadlines and post-skip pacing at 15 minutes. A genuinely
  * longer quiet interval may therefore be skipped rather than waited out. */
-const WS_RECV_MAX_GAP_MS = 15 * 60_000
+export const WS_RECV_MAX_GAP_MS = 15 * 60_000
+
+/** After this long, a required protocol receive that is still waiting is
+ * reported as an error rather than a warning, since it is no longer
+ * plausible that the server is merely slow. */
+const WS_RECV_ESCALATE_MS = 10 * 60_000
 
 /** Minimum receive wait and slack beyond the recorded quiet interval. */
 const WS_RECV_SLACK_MS = 30_000
@@ -291,6 +310,7 @@ interface SessionState {
   reorderBuffer: string[]
   timingAnchor: TimingAnchor | null
   skippedReceive: boolean
+  onRequiredReceiveWait: ((wait: RequiredReceiveWait | null) => void) | null
 }
 
 function replaceSessionTokens(
@@ -529,7 +549,7 @@ async function handleWsRecv(
 
   if (expectingObj === null) {
     // String comparison (e.g. the "o" open frame) — must match exactly.
-    const receivedStr = await receiveNext(event, state)
+    const receivedStr = await receiveRequired(event, state)
     if (expectingStr !== receivedStr) {
       throw new Error(`Expected string ${expectingStr} but got ${receivedStr}`)
     }
@@ -599,20 +619,79 @@ async function handleWsRecv(
   return { reason: "mismatch", line: event.lineNumber }
 }
 
-/** Receive the next non-ignorable message from the WebSocket. */
-async function receiveNext(
+/**
+ * Warning callback for a required protocol receive that is still waiting.
+ * `receive` calls this once per poll interval with the cumulative wait.
+ */
+function requiredReceiveWaiting(
+  event: RecordingEvent & {
+    type: "WS_RECV" | "WS_RECV_INIT" | "WS_RECV_BEGIN_UPLOAD"
+  },
+  state: SessionState,
+): (elapsedSeconds: number) => void {
+  return (elapsedSeconds) => {
+    const { level, message } = requiredReceiveWaitLine(
+      event.type,
+      event.lineNumber,
+      elapsedSeconds,
+    )
+    if (level === "error") {
+      state.logger.error(message)
+    } else {
+      state.logger.warn(message)
+    }
+  }
+}
+
+/**
+ * Line for a required protocol receive that is still waiting. Past
+ * `WS_RECV_ESCALATE_MS` it becomes an error with an operator hint: a required
+ * message this late is a stall, not latency.
+ *
+ * @internal Exported for testing.
+ */
+export function requiredReceiveWaitLine(
+  type: string,
+  lineNumber: number,
+  elapsedSeconds: number,
+): { level: "warn" | "error"; message: string } {
+  const message = `${type} line ${lineNumber}: Haven't received message after ${elapsedSeconds} seconds`
+  if (elapsedSeconds * 1000 < WS_RECV_ESCALATE_MS) {
+    return { level: "warn", message }
+  }
+  return {
+    level: "error",
+    message:
+      `${message} — the session cannot continue without it. If the ` +
+      `application is not still starting, the recording no longer matches the ` +
+      `application; Ctrl+C stops the test.`,
+  }
+}
+
+/**
+ * Wait for a message the session cannot continue without, reporting the wait
+ * so a stalled session can be identified, and warning while it waits.
+ */
+async function receiveRequired(
   event: RecordingEvent & {
     type: "WS_RECV" | "WS_RECV_INIT" | "WS_RECV_BEGIN_UPLOAD"
   },
   state: SessionState,
 ): Promise<string> {
-  const receivedStr = await state.webSocket!.receive((elapsed) => {
-    state.logger.warn(
-      `${event.type} line ${event.lineNumber}: Haven't received message after ${elapsed} seconds`,
+  state.onRequiredReceiveWait?.({
+    type: event.type,
+    lineNumber: event.lineNumber,
+  })
+  try {
+    const receivedStr = await state.webSocket!.receive(
+      requiredReceiveWaiting(event, state),
+      state.signal,
     )
-  }, state.signal)
-  state.logger.debug(`${event.type} received: ${receivedStr}`)
-  return receivedStr
+    state.logger.debug(`${event.type} received: ${receivedStr}`)
+    return receivedStr
+  } finally {
+    state.onRequiredReceiveWait?.(null)
+  }
 }
 
 async function handleWsRecvInit(
@@ -623,12 +702,7 @@ async function handleWsRecvInit(
     throw new Error("Tried to WS_RECV_INIT but no websocket is open")
   }
 
-  const receivedStr = await state.webSocket.receive((elapsed) => {
-    state.logger.warn(
-      `WS_RECV_INIT line ${event.lineNumber}: Haven't received message after ${elapsed} seconds`,
-    )
-  }, state.signal)
-  state.logger.debug(`WS_RECV_INIT received: ${receivedStr}`)
+  const receivedStr = await receiveRequired(event, state)
 
   const parsed = parseMessage(receivedStr)
   const sessionId = (
@@ -653,12 +727,7 @@ async function handleWsRecvBeginUpload(
     throw new Error("Tried to WS_RECV_BEGIN_UPLOAD but no websocket is open")
   }
 
-  const receivedStr = await state.webSocket.receive((elapsed) => {
-    state.logger.warn(
-      `WS_RECV_BEGIN_UPLOAD line ${event.lineNumber}: Haven't received message after ${elapsed} seconds`,
-    )
-  }, state.signal)
-  state.logger.debug(`WS_RECV_BEGIN_UPLOAD received: ${receivedStr}`)
+  const receivedStr = await receiveRequired(event, state)
 
   const parsed = parseMessage(receivedStr)
   const response = parsed?.["response"] as Record<string, unknown> | undefined
@@ -785,6 +854,7 @@ export async function runSession(
     reorderBuffer: [],
     timingAnchor: null,
     skippedReceive: false,
+    onRequiredReceiveWait: config.onRequiredReceiveWait ?? null,
   }
 
   let started = false

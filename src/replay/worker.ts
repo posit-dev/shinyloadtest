@@ -6,8 +6,8 @@
  */
 
 import type { Logger } from "../logger.js"
-import { Stats, runSession } from "./session.js"
-import type { SessionConfig } from "./session.js"
+import { Stats, WS_RECV_MAX_GAP_MS, runSession } from "./session.js"
+import type { RequiredReceiveWait, SessionConfig } from "./session.js"
 import type { Recording, Creds } from "../types.js"
 import type { ReplayTerminalUI } from "./ui.js"
 
@@ -32,6 +32,11 @@ export interface EnduranceTestConfig {
   ui?: ReplayTerminalUI
   /** No-throw sink for allowlisted, credential-free event objects. */
   diagnostics?: import("./diagnostics.js").ReplayDiagnostics
+  /**
+   * Warmup liveness ceiling in milliseconds. Defaults to `WARMUP_CEILING_MS`;
+   * injected by tests so they need not wait 15 minutes.
+   */
+  warmupCeilingMs?: number
 }
 
 /**
@@ -49,6 +54,56 @@ export class MaxErrorsExceededError extends Error {
     this.name = "MaxErrorsExceededError"
     this.maxErrors = maxErrors
     this.totalFailures = totalFailures
+  }
+}
+
+/** A worker and the required receive it was waiting on when warmup timed out. */
+export interface WarmupStall {
+  workerId: number
+  wait: RequiredReceiveWait
+}
+
+/**
+ * Error thrown when warmup goes `WARMUP_CEILING_MS` without any session
+ * finishing. On its own that is a stall, not a slow start: a session that is
+ * still progressing keeps resetting the ceiling, so reaching it means nothing
+ * is finishing any more. `stalled` names the workers that were parked on a
+ * required protocol message at that moment, which is where the run is stuck.
+ */
+export class WarmupTimeoutError extends Error {
+  readonly ceilingMs: number
+  readonly numWorkers: number
+  readonly stalled: WarmupStall[]
+
+  constructor(options: {
+    ceilingMs: number
+    numWorkers: number
+    stalled: WarmupStall[]
+  }) {
+    const { ceilingMs, numWorkers, stalled } = options
+    const named = stalled.slice(0, WARMUP_TIMEOUT_LISTED_WORKERS)
+    const remaining = stalled.length - named.length
+    const status =
+      stalled.length === 0
+        ? "No worker was waiting on a required message."
+        : `Stalled: ${named
+            .map(
+              ({ workerId, wait }) =>
+                `worker ${workerId + 1} was waiting for ${wait.type} at recording line ${wait.lineNumber}`,
+            )
+            .join("; ")}${remaining > 0 ? `; and ${remaining} more` : ""}.`
+
+    super(
+      `Warmup timed out after ${formatDuration(ceilingMs)}: no session finished, ` +
+        `so the test never started maintaining load (${stalled.length} of ` +
+        `${numWorkers} workers waiting). ${status} The application may still ` +
+        `be starting; if it is not, the recording no longer matches what the ` +
+        `application sends over the WebSocket.`,
+    )
+    this.name = "WarmupTimeoutError"
+    this.ceilingMs = ceilingMs
+    this.numWorkers = numWorkers
+    this.stalled = stalled
   }
 }
 
@@ -78,6 +133,14 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
+/** Human-readable duration for messages: `300ms`, `45s`, `15 minutes`. */
+function formatDuration(ms: number): string {
+  if (ms < 1_000) return `${ms}ms`
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`
+  const minutes = Math.round(ms / 60_000)
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`
+}
+
 // ---------------------------------------------------------------------------
 // Failure backoff
 // ---------------------------------------------------------------------------
@@ -90,6 +153,30 @@ const RETRY_MAX_DELAY_MS = 30_000
 
 /** Jitter range as a fraction of the exponential delay (±25%). */
 const RETRY_JITTER_FRACTION = 0.25
+
+/**
+ * How long warmup may go without a session finishing before the run is
+ * declared stuck.
+ *
+ * A required-protocol receive (`WS_RECV_INIT`, `WS_RECV_BEGIN_UPLOAD`, the
+ * SockJS open frame) waits indefinitely by design: a recording says nothing
+ * about how long the server may take, and failing a session that would have
+ * recovered only adds retry load. That is safe while something bounds the run
+ * — the loaded-duration timer does, but only after warmup: it starts once
+ * every worker's first session has finished, and `--max-errors` only counts
+ * sessions that end. Without a ceiling, a run in which every worker is waiting
+ * on a required message never finishes, never trips `--max-errors`, and can
+ * only be stopped by Ctrl+C, which exits without closing anything.
+ *
+ * This bounds *liveness*, not the individual receive: a session that is slow
+ * but still finishing keeps resetting it. 15 minutes is the same cap the
+ * receive policy puts on a quiet interval (`WS_RECV_MAX_GAP_MS`), so the tool
+ * has one ceiling rather than two.
+ */
+export const WARMUP_CEILING_MS = WS_RECV_MAX_GAP_MS
+
+/** Workers named in the warmup-timeout message before it is summarized. */
+const WARMUP_TIMEOUT_LISTED_WORKERS = 5
 
 /**
  * Jittered exponential backoff: ~1s after the first failure, doubling per
@@ -128,6 +215,7 @@ export async function runEnduranceTest(
     argsJson,
     ui,
     diagnostics,
+    warmupCeilingMs = WARMUP_CEILING_MS,
   } = config
 
   const stats = new Stats()
@@ -174,6 +262,46 @@ export async function runEnduranceTest(
         stopAll()
       }
     }
+  }
+
+  // Warmup liveness watchdog. A session that is slow but still finishing resets
+  // it; reaching the ceiling means nothing is finishing, and only an abort can
+  // unblock a session parked on a required protocol receive.
+  let inWarmup = true
+  let warmupTimedOut = false
+  let warmupTimer: ReturnType<typeof setTimeout> | null = null
+  /** The required receive each worker is currently waiting on, by worker id. */
+  const waitingReceives = new Map<number, RequiredReceiveWait>()
+  /** What `waitingReceives` held when the ceiling fired. */
+  const stalledAtTimeout: WarmupStall[] = []
+
+  function clearWarmupWatchdog(): void {
+    if (warmupTimer !== null) {
+      clearTimeout(warmupTimer)
+      warmupTimer = null
+    }
+  }
+
+  function armWarmupWatchdog(): void {
+    clearWarmupWatchdog()
+    if (!inWarmup || warmupCeilingMs <= 0) return
+    warmupTimer = setTimeout(() => {
+      warmupTimer = null
+      if (!inWarmup || warmupTimedOut) return
+      warmupTimedOut = true
+      // Snapshot before aborting: each session clears its entry as it unwinds.
+      for (const [workerId, wait] of waitingReceives) {
+        stalledAtTimeout.push({ workerId, wait })
+      }
+      // stopAll() aborts every waiting receive, so the sessions parked on a
+      // required message end as canceled and close their sockets by handshake.
+      logger.error(
+        `Warmup timed out after ${formatDuration(warmupCeilingMs)} with no session finished — stopping test`,
+      )
+      stopAll()
+    }, warmupCeilingMs)
+    // Never keep the process alive just for the watchdog.
+    warmupTimer.unref?.()
   }
 
   // Per-worker warmup gates. Every worker settles its own gate on every
@@ -230,12 +358,23 @@ export async function runEnduranceTest(
         argsJson,
         signal,
         diagnostics,
+        onRequiredReceiveWait: (wait) => {
+          if (wait === null) {
+            waitingReceives.delete(workerId)
+          } else {
+            waitingReceives.set(workerId, wait)
+          }
+        },
       }
     }
 
     /** Run one session and fold its outcome into the backoff state. */
     async function runOneSession(sessionConfig: SessionConfig): Promise<void> {
       const outcome = await runSession(sessionConfig, stats)
+      waitingReceives.delete(workerId)
+      // A session finished, so warmup is still making progress: restart the
+      // ceiling rather than measuring from the start of the run.
+      armWarmupWatchdog()
       if (outcome === "failed") {
         consecutiveFailures++
       } else if (outcome === "done") {
@@ -318,7 +457,23 @@ export async function runEnduranceTest(
   try {
     // Wait for all workers to complete their first session (warmup phase)
     logger.info("Waiting for warmup to complete")
+    armWarmupWatchdog()
     await Promise.all(warmupPromises)
+    inWarmup = false
+    clearWarmupWatchdog()
+
+    if (warmupTimedOut) {
+      // Abort already happened when the ceiling fired; let the parked sessions
+      // finish their cancellation, then report the stall.
+      await Promise.all(workerPromises)
+      const reason = `Warmup timed out after ${formatDuration(warmupCeilingMs)}`
+      ui?.finishStartupFailure(reason)
+      throw new WarmupTimeoutError({
+        ceilingMs: warmupCeilingMs,
+        numWorkers,
+        stalled: stalledAtTimeout,
+      })
+    }
 
     if (workerFailed || maxErrorsTriggered) {
       // Already stopping — skip loaded phase
@@ -358,6 +513,7 @@ export async function runEnduranceTest(
     )
     ui?.finish(counts)
   } finally {
+    clearWarmupWatchdog()
     if (progressInterval !== null) {
       clearInterval(progressInterval)
     }

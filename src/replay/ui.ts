@@ -213,6 +213,15 @@ export class ReplayTerminalUI {
     w("\n")
   }
 
+  /**
+   * Stop the display for a run that could not get past warmup. The reason is
+   * also thrown as an error, so it is not repeated here.
+   */
+  finishStartupFailure(reason: string): void {
+    this.stopUpdates()
+    this.spinner.fail(red(reason))
+  }
+
   private warmupText(): string {
     const { workers } = this.config
 
