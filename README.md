@@ -119,6 +119,19 @@ string-frame matching retain their existing semantics. Replay is
 response-driven, so this policy does not
 enforce the recorded total duration, and very long gaps can exceed the cap.
 
+Essential protocol receives cannot be skipped: the session ID and upload job
+ID they carry (`WS_RECV_INIT`, `WS_RECV_BEGIN_UPLOAD`, and the SockJS open
+frame matched by an exact string `WS_RECV`) are substituted into later
+messages and URLs, so the session cannot continue without them. They have no
+fixed deadline either — a cold app start can be slow, and failing a session
+that would have recovered only adds retry load. They wait for the message,
+logging a warning with the recording line every 30 seconds, and are bounded by
+the end of the run rather than by a timer: the loaded-duration expiry,
+`--max-errors` once other sessions have failed, and Ctrl+C. Warmup is the
+exception: the loaded-duration timer starts only after every worker's first
+session has finished, so a run in which all workers are waiting for a required
+message at that point does not end on its own.
+
 Each `session_end` includes counts for completed `WS_RECV` events:
 `wsRecvMatched` (including buffered and string matches), `wsRecvIgnored`
 (expected messages filtered as ignorable), `wsRecvTimeout` (no non-ignorable
@@ -150,6 +163,12 @@ Things to know when reading the file:
 - The writer starts after server preflight validation, so it records replay
   sessions only — the requests made to detect the server type are not in
   the log.
+- A session waiting for an essential protocol message has no event of its own:
+  nothing follows its last `ws_open` until the message arrives or the run is
+  cancelled. While it waits, the console repeats a warning naming the
+  recording line every 30 seconds. If the console output was not captured, a
+  file whose sessions end at `ws_open` with no `session_end` is the signature
+  of a stuck run, not of a slow one.
 - On an orderly finish, `run_end` is the last line, with `activeSockets`
   (WebSockets that never reported closure within the wait window) and a
   `complete` flag. Ctrl+C or `SIGTERM` exits immediately: a file with no
