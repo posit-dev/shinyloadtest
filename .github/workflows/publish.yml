@@ -43,13 +43,25 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # Publishing authenticates via OIDC trusted publishing (no NPM_TOKEN
+      # secret). That requires npm >= 11.5.1 and cannot be done with a
+      # non-reproducible `npm@latest`, so pin the version. Older npm still
+      # signs a provenance statement but sends the PUT unauthenticated, which
+      # npm reports as a misleading `404 Not Found`. Node 22 bundles npm 10.
+      - name: Pin npm for OIDC trusted publishing
+        run: npm install -g npm@11.21.1
+
       - run: npm ci
       - run: npm run build
 
+      # Derive from the version string rather than the release event: the
+      # event payload is absent when a release is re-published by hand, and
+      # an empty value would fall through to `latest` for a prerelease.
       - name: Determine npm tag
         id: tag
         run: |
-          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+          version=$(node -p "require('./package.json').version")
+          if [[ "$version" == *-* ]]; then
             echo "npm_tag=next" >> "$GITHUB_OUTPUT"
           else
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
